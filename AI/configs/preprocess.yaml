@@ -1,0 +1,15 @@
+paths:
+  raw_data: data/raw_data
+  output: data/dataset
+
+classes:
+  - Can
+  - Pet bottle
+  - Styrofoam
+
+split:
+  train_ratio: 0.8
+  seed: 42
+
+parallel:
+  max_workers: auto

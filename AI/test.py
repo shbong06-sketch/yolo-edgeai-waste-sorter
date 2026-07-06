@@ -1,1 +1,0 @@
-print("Merge 테스트용")
