@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 
-def load_config(path="configs/preprocess.yaml"):
+def load_config(path="AI/configs/preprocess.yaml"):
     with open(path, 'r', encoding='utf-8') as f:
         cfg = yaml.safe_load(f)     # YAML → dict 변환
 

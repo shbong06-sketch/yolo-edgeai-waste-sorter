@@ -1,6 +1,6 @@
 paths:
-  raw_data: data/raw_data
-  output: data/dataset
+  raw_data: AI/data/raw_data
+  output: AI/data/full_dataset
 
 classes:
   - Can
