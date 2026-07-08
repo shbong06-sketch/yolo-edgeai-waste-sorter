@@ -94,9 +94,58 @@ python AI/src/inference/detect_realtime.py --model runs/detect/runs/train_full/y
 
 ---
 
-## 4. 다음 주차 계획 (Week 2)
+## 4. 학습 결과 분석
 
-- [ ] 데이터 증강 기법 추가 적용 후 모델 재학습
-- [ ] 모델 성능 평가 (mAP, IoU 측정)
-- [ ] ONNX/TensorRT 등 경량화 변환
-- [ ] ROS 팀과 출력 인터페이스 확정
+### Best Epoch 성능 비교
+
+| 지표 | yolov8n (epoch 68) | yolo11n (epoch 81) |
+|---|---|---|
+| Precision | 0.8053 | 0.8121 |
+| Recall | 0.8068 | **0.8164** |
+| mAP50 | 0.8665 | **0.8719** |
+| mAP50-95 | 0.8014 | **0.8066** |
+
+- **yolo11n**이 전반적으로 yolov8n 대비 소폭 높은 성능 기록(미세한 차이)
+- 두 모델 모두 mAP50 기준 86% 이상으로 베이스라인 충족
+- 일반적으로 원본과 최적화 시에도 더 가벼운 **yolo11n**를 최종 모델로 사용하는 것을 제안
+
+### Precision-Recall Curve
+
+| yolov8n | yolo11n |
+|---|---|
+| ![PR_yolov8n](./images/PR_yolov8n.png) | ![PR_yolo11n](./images/PR_yolo11n.png) |
+
+### Confusion Matrix
+
+| yolov8n | yolo11n |
+|---|---|
+| ![confusion_yolov8n](./images/confusion_yolov8n.png) | ![confusion_yolo11n](./images/confusion_yolo11n.png) |
+
+- 두 모델에서 공통적으로 **Pet bottle 클래스의 탐지 성능이 상대적으로 낮게** 관찰됨.
+- 전체 클래스에 대해, 배경(background) 오탐지(false positive)가 문제로 보임(*배경을 객체로 인식*)
+
+### 문제점 및 가설
+
+#### Pet bottle 클래스 탐지 성능이 떨어짐.
+
+**근거**: Confusion Matrix에서 Pet bottle의 정탐지(True Positive) 비율이 Can 대비 낮고, 배경(background)으로 잘못 분류된 케이스가 다수 관찰됨.
+
+**가설**
+1. 형태 다양성 — 페트병은 색상(투명/파랑/초록), 형태(구부러짐, 찌그러짐), 라벨 유무 등 intra-class variation이 큼
+2. 겹침 문제 — 데이터셋에 객체 간 겹침이 많은 이미지가 다수 포함되어 있어 탐지 난이도가 높음
+
+**해결 방안**
+- Pet bottle 클래스에 데이터 증강(색상 변환, 형태 왜곡) 집중 적용
+- Hard Negative Mining(학습/검증 과정에서 틀린 이미지를 학습 데이터에 추가해 재학습 진행)
+- Confidence Threshold 조정(배경을 오탐하는 비율이 특히 많은 것으로 보아 비교적 높은 값 넣어서 비교)
+
+#### 배경을 객체로 오탐지 (False Positive)
+
+**근거**: Confusion Matrix의 background 열에서 일부 오탐지 확인.
+
+**가설**
+- 배경에 Can/Pet bottle과 유사한 텍스처나 원형 패턴이 존재
+- 학습 데이터의 배경 다양성 부족
+
+**해결 방안**
+- 데이터 증강 중 CutOut/RandErasing으로 배경 일반화 능력 향상
