@@ -7,7 +7,7 @@ from PIL import Image
 
 # 1. 경로 설정 >> config에 넣기
 RAW_DATA_DIR = r"data\raw_data"
-OUTPUT_DIR = r"data\dataset"
+OUTPUT_DIR = r"data\full_dataset"
 TRAIN_RATIO = 0.8  # Train 80%, Val 20%
 
 # 2. 클래스 정의 (원래 폴더명들을 리스트로 적어주세요. 인덱스가 클래스 번호가 됩니다)

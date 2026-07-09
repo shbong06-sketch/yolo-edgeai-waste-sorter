@@ -1,0 +1,7 @@
+ultralytics==8.4.87
+opencv-python>=4.8
+numpy
+matplotlib
+pandas
+PyYAML
+pillow

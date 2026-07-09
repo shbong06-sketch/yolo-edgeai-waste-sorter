@@ -14,7 +14,7 @@
 * 작업자의 안전 문제와 구인난을 해결하기 위해, 비전 AI와 로봇 공학을 결합한 고속 자동 선별 시스템의 도입이 시급합니다.
 
 ### 2. 핵심 목표 (MVP)
-* **데이터셋 구축:** AIHub 데이터를 활용한 **[금속 캔, 페트병, 스티로폼]** 3종 맞춤형 데이터셋 구축 (총 1,500장)
+* **데이터셋 구축:** AIHub 데이터를 활용한 **[금속 캔, 페트병, 스티로폼]** 3종 맞춤형 데이터셋 구축 (총 9,999장)
 * **AI 모델 최적화:** 실시간 추론을 위한 경량화된 YOLO 객체 탐지 모델 학습 및 성능 확보
 
 ### 3. 추가 목표 (Stretch Goal)
@@ -60,6 +60,26 @@ Plaintext
  ┃ ┗ 📜 project_report.md  # 최종 수행 보고서
  ┗ 📜 .gitignore           # 대용량 데이터셋 및 모델 가중치(.pt, .onnx) 제외 설정
  ```
+
+## 📊 데이터셋 (Dataset)
+
+| 구분 | 내용 |
+|---|---|
+| 전체 | 9,999장 (train 7,999 / val 2,000, 80:20 split) |
+| 클래스 | Can (3,333), Pet bottle (3,333), Styrofoam (3,333) |
+| 출처 | AIHub 선별영상 추출 이미지(영상추출) 9,000장, 개별 재활용품 이미지(직접촬영) 999장 ([AIHub 링크](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&aihubDataSe=data&dataSetSn=71362)) |
+| 해상도 | 640×640 (YOLO 입력 기준) |
+| 라벨 포맷 | YOLO format (`class_id x_center y_center width height`) |
+
+| Class        | Train    | Val      | Total    |
+|---|---|---|---|
+| Can          | 2,667    | 666      | 3,333    |
+| Pet bottle   | 2,666    | 667      | 3,333    |
+| Styrofoam    | 2,666    | 667      | 3,333    |
+| **Total**    | **7,999**| **2,000**| **9,999**|
+
+> 메타데이터: `dataset_metadata.csv` (이미지별 출처, 클래스, split 정보 포함)
+> 다운로드: [Google Drive](https://drive.google.com/file/d/1G4qchajo2-Tmv9D_KOxuKr_NzRUwT2DO/view?usp=sharing) - `yolo_waste_dataset_v1.0.zip`
 
 ## 🛠️ 기술 스택 (Tech Stack)
 - AI / Data: PyTorch, Ultralytics (YOLOv8/v10), OpenCV, Pandas, NumPy, Scikit-learn, Roboflow
