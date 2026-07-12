@@ -23,3 +23,37 @@ Desktop.ini
 .DS_Store
 .AppleDouble
 .LSOverride
+
+#----추가
+
+# =================================================================
+# YOLO & Edge AI Project .gitignore (Root)
+# =================================================================
+
+# 1. AI 대용량 가중치 및 데이터셋 차단
+AI/weights/
+*.pt
+*.onnx
+*.engine
+**/datasets/
+
+# 2. ROS2 빌드 산출물 및 로그 차단
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+ros2_ws/.colcon/
+
+# 3. 파이썬 컴파일 캐시 차단
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# 4. 개발 툴 및 IDE 설정 파일 차단
+.vscode/
+.idea/
+.DS_Store
+
+# 5. 기타 임시 파일
+*.log

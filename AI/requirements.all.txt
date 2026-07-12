@@ -45,7 +45,7 @@ Pygments==2.20.0
 pyparsing==3.3.2
 python-dateutil==2.9.0.post0
 pytz==2026.2
-pywin32==312
+#pywin32==312 윈도우 전용 패키지
 PyYAML==6.0.3
 pyzmq==27.1.0
 requests==2.34.2
