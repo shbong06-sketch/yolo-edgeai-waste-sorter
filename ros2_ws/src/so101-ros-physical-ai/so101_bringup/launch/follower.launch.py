@@ -109,7 +109,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("namespace", default_value="follower"),
             DeclareLaunchArgument("hardware_type", default_value="real"),  # real | mock
-            DeclareLaunchArgument("usb_port", default_value="/dev/so101_follower"),
+            DeclareLaunchArgument("usb_port", default_value="/dev/ttyACM0"),
             DeclareLaunchArgument(
                 "frame_prefix",
                 default_value="",
