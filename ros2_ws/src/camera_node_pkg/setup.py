@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'waste_detector'
+package_name = 'camera_node_pkg'
 
 setup(
     name=package_name,
@@ -13,14 +13,13 @@ setup(
     ],
     install_requires=[
         'setuptools',
-        'ultralytics==8.4.87',
         'opencv-python>=4.8',
         'numpy',
-        ],
+    ],
     zip_safe=True,
     maintainer='shbong',
     maintainer_email='shbong@todo.todo',
-    description='YOLO based waste detection ROS2 package',
+    description='Camera node for waste detection system',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -29,8 +28,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'camera_node = waste_detector.camera_node:main',
-            'detector_node = waste_detector.detector_node:main',
+            'camera_node = camera_node_pkg.camera_node:main',
         ],
     },
 )

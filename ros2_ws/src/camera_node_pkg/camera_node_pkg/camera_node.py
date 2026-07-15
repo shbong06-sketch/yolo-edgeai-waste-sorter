@@ -16,7 +16,7 @@ class CameraNode(Node):
     파라미터:
     - ~camera_id: 카메라 인덱스 (기본값: 0)
     - ~frame_width: 프레임 너비 (기본값: 640)
-    - ~frame_height: 프레임 높이 (기본값: 640)
+    - ~frame_height: 프레임 높이 (기본값: 480)
     - ~fps: 초당 프레임 수 (기본값: 30)
     """
 
@@ -25,10 +25,10 @@ class CameraNode(Node):
         
         # 파라미터 선언 및 설정
         # ROS2 파라미터는 실행 시점에 값을 변경할 수 있음
-        # 예: ros2 run waste_detector camera_node --ros-args -p camera_id:=1
+        # 예: ros2 run camera_node_pkg camera_node --ros-args -p camera_id:=1
         self.declare_parameter('camera_id', 0)
         self.declare_parameter('frame_width', 640)
-        self.declare_parameter('frame_height', 640)
+        self.declare_parameter('frame_height', 480)
         self.declare_parameter('fps', 30)
         
         # 파라미터 값 가져오기

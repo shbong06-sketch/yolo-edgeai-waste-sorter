@@ -167,9 +167,7 @@ class DetectorNode(Node):
         if boxes is None or len(boxes) == 0:
             return detection_msg
         
-        # ==========================================
         # 각 바운딩박스를 Detection2D로 변환
-        # ==========================================
         for box in boxes:
             detection = Detection2D()
             
