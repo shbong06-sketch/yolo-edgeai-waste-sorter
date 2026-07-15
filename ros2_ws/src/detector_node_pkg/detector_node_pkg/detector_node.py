@@ -29,7 +29,7 @@ class DetectorNode(Node):
         super().__init__('detector_node')
         
         # 1. 파라미터 선언 및 설정
-        self.declare_parameter('model_path', 'yolo11n.pt')
+        self.declare_parameter('model_path', 'best.pt')
         self.declare_parameter('conf_threshold', 0.5)
         self.declare_parameter('iou_threshold', 0.45)
         self.declare_parameter('device', 'cpu')
@@ -100,10 +100,18 @@ class DetectorNode(Node):
         # 4. 탐지 결과 발행
         self.publisher_.publish(detection_msg)
         
-        # 탐지된 객체 수 로깅
-        num_detections = len(detection_msg.detections)
-        if num_detections > 0:
-            self.get_logger().info(f'탐지된 객체: {num_detections}개')
+        # 탐지된 객체 상세 로깅
+        for i, det in enumerate(detection_msg.detections):
+            class_name = det.results[0].hypothesis.class_id
+            score = det.results[0].hypothesis.score
+            cx = det.bbox.center.position.x
+            cy = det.bbox.center.position.y
+            w = det.bbox.size_x
+            h = det.bbox.size_y
+            self.get_logger().info(
+                f'탐지 [{i}] {class_name} (신뢰도: {score:.2f}) '
+                f'위치: ({cx:.0f}, {cy:.0f}) 크기: {w:.0f}x{h:.0f}'
+            )
 
     def imgmsg_to_cv2(self, msg):
         """
@@ -181,10 +189,10 @@ class DetectorNode(Node):
             height = y2 - y1
             
             # 바운딩박스 설정
-            detection.bbox.center.x = center_x
-            detection.bbox.center.y = center_y
-            detection.bbox.size.x = width
-            detection.bbox.size.y = height
+            detection.bbox.center.position.x = center_x
+            detection.bbox.center.position.y = center_y
+            detection.bbox.size_x = width
+            detection.bbox.size_y = height
             
             # 클래스 ID 및 신뢰도
             cls_id = int(box.cls[0])
