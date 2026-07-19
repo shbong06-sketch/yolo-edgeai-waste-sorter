@@ -1,82 +1,130 @@
-# ros2 구조
+# YOLO Edge AI waste Sorter - ROS2
 
 ## 패키지 구조
 
 *노드별로 독립된 패키지로 구성*
 ```
 ros2_ws/
-├── src/
-│   ├── camera_node_pkg/        # 패키지 1 (카메라 노드)
-│   │   ├── camera_node_pkg/
-│   │   │   ├── __init__.py
-│   │   │   └── camera_node.py
-│   │   ├── resource/camera_node_pkg
-│   │   ├── test/
-│   │   ├── package.xml
-│   │   ├── setup.py
-│   │   └── setup.cfg
-│   └── detector_node_pkg/      # 패키지 2 (객체 탐지 노드)
-│       ├── detector_node_pkg/
-│       │   ├── __init__.py
-│       │   └── detector_node.py
-│       ├── resource/detector_node_pkg
-│       ├── test/
-│       ├── package.xml
-│       ├── setup.py
-│       └── setup.cfg
-├── .venv/                      # Python 가상환경
-├── build/                      # 빌드 중간 파일
-├── install/                    # 빌드 결과물
-└── log/
+└── src/
+    ├── camera_node_pkg/            # 패키지 1 (카메라 노드)
+    │   ├── camera_node_pkg/
+    │   │   ├── __init__.py
+    │   │   └── camera_node.py
+    │   ├── resource/camera_node_pkg
+    │   ├── test/
+    │   ├── package.xml
+    │   ├── setup.py
+    │   └── setup.cfg
+    │
+    ├── detector_node_pkg/          # 패키지 2 (객체 탐지 노드)
+    │   ├── detector_node_pkg/
+    │   │   ├── __init__.py
+    │   │   └── detector_node.py
+    │   ├── resource/detector_node_pkg
+    │   ├── test/
+    │   ├── package.xml
+    │   ├── setup.py
+    │   └── setup.cfg
+    │
+    ├── robot_control_node/         # 패키지 3 (호모그래피 및 IK 제어 노드)
+    │   ├── robot_control_node/
+    │   │   ├── __init__.py
+    │   │   └── robot_control_node.py
+    │   ├── package.xml
+    │   ├── setup.py
+    │   └── setup.cfg
+    │
+    └── so101-ros-physical-ai/      # 패키지 4 (물리 AI 로봇)
+        ├── so101_bringup/
+        ├── so101_description/
+        └── so101_teleop/
 ```
 
-## 개발 환경 설정 (venv)
+## 시스템 흐름
 
-```bash
-cd ros2_ws
-
-# venv 생성
-python3 -m venv .venv
-
-# venv 활성화
-source .venv/bin/activate
-
-# colcon 설치
-pip install colcon-common-extensions
-
-# 패키지 의존성 설치
-pip install camera_node_pkg
-pip install detector_node_pkg
-
-# ROS2 환경 등록
-source /opt/ros/jazzy/setup.bash
-
-# 빌드
-colcon build
-
-# 빌드 결과 등록
-source install/setup.bash
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  camera_node_pkg                                                │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ /camera_node                                              │  │
+│  │ USB 카메라 → ROS Image 메시지 발행                            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+           │
+           │ /camera/image_raw (sensor_msgs/msg/Image)
+           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  detector_node_pkg                                              │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ /detector_node                                            │  │
+│  │ YOLO 모델로 객체 탐지 → Detection2DArray 발행                  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+           │
+           │ /detection_results (vision_msgs/msg/Detection2DArray)
+           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  robot_control_node                                             │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ /robot_control_node                                       │  │
+│  │ 픽셀좌표 → Homography 변환 → IK 연산 → 관절 각도 산출            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+           │
+           │ /joint_trajectory_controller/joint_trajectory
+           │ (trajectory_msgs/msg/JointTrajectory)
+           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  so101-ros-physical-ai                                          │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ /so101_bringup_node                                       │  │
+│  │ ROS2 관절 명령 → Serial 신호 변환 → USB 통신                   │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+           │
+           │ USB Serial (/dev/ttyUSBX)
+           ▼
+      ┌───────────┐
+      │ SO-ARM101 │
+      └───────────┘
 ```
 
 ## 의존성
 
-| 구분 | camera_node_pkg | detector_node_pkg |
+| 구분 | ROS2 | Python |
 |---|---|---|
-| ROS2 | rclpy, sensor_msgs | rclpy, sensor_msgs, vision_msgs |
-| Python | opencv-python, numpy | ultralytics, opencv-python, numpy, torch |
+| camera_node_pkg | rclpy, sensor_msgs | opencv-python, numpy |
+| detector_node_pkg | rclpy, sensor_msgs, vision_msgs | ultralytics, opencv-python, numpy, torch |
+| robot_control_node |  |  |
+| so101-ros-physical-ai |  |  |
 
-## 인터페이스 구조
+## 빌드 테스트 환경 설정 (.venv)
 
-| 토픽 | 메시지 타입 | 발행자 | 구독자 |
-|---|---|---|---|
-| `/camera/image_raw` | `sensor_msgs/Image` | `camera_node` | `detector_node` |
-| `/detection_results` | `vision_msgs/Detection2DArray` | `detector_node` | 나중 부분(`robot_control`) |
+```bash
+cd ros2_ws
+
+# 1. venv 생성 및 활성화
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 2. ROS2 환경 등록
+source /opt/ros/jazzy/setup.bash
+
+# 3. 빌드 도구 설치
+pip install colcon-common-extensions
+
+# 4. 빌드
+colcon build
+
+# 5. 빌드 결과 등록
+source install/setup.bash
+```
 
 ## 각 노드 구성
 
 ### 1. camera_node
 
-카메라 영상을 구독하여 ROS2 토픽으로 발행하는 노드
+카메라 영상을 읽어서 ROS2 토픽으로 발행하는 노드
 
 *역할:*
 - USB 카메라 또는 웹캠에서 영상 프레임을 읽음
@@ -172,11 +220,15 @@ ros2 run detector_node_pkg detector_node --ros-args \
   -p device:=cuda
 ```
 
-## ROS2 Jazzy 호환 참고사항
+### 3. robot_control_node
 
-Pose2D와 BoundingBox2D의 속성명이 이전 버전과 다릅니다:
 
-| 속성 | 이전 (Humble 등) | Jazzy |
-|---|---|---|
-| 중심점 좌표 | `bbox.center.x`, `bbox.center.y` | `bbox.center.position.x`, `bbox.center.position.y` |
-| 바운딩박스 크기 | `bbox.size.x`, `bbox.size.y` | `bbox.size_x`, `bbox.size_y` |
+### 4. so101_bringup_node
+
+
+## 실행/테스트 방법
+
+```bash
+# 전체 실행
+
+```
