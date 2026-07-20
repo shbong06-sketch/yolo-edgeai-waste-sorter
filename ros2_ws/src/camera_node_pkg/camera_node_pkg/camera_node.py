@@ -26,7 +26,7 @@ class CameraNode(Node):
         # 파라미터 선언 및 설정
         # ROS2 파라미터는 실행 시점에 값을 변경할 수 있음
         # 예: ros2 run camera_node_pkg camera_node --ros-args -p camera_id:=1
-        self.declare_parameter('camera_id', 0)
+        self.declare_parameter('camera_id', 2)
         self.declare_parameter('frame_width', 640)
         self.declare_parameter('frame_height', 480)
         self.declare_parameter('fps', 30)

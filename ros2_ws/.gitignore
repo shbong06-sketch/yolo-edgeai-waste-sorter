@@ -1,0 +1,54 @@
+
+# ==========================================
+# ROS2 / Colcon Build Artifacts
+# ==========================================
+build/
+install/
+log/
+.ament_index/
+
+# ==========================================
+# AI Models & Heavy Weights (YOLO / VLA)
+# ==========================================
+*.pt
+*.pth
+*.onnx
+best.pt
+
+# ==========================================
+# Local Datasets & MCAP / Rosbag Recordings
+# ==========================================
+*.mcap
+*.db3
+*.bag
+data/
+datasets/
+recordings/
+
+# ==========================================
+# Calibration & Local Matrices
+# ==========================================
+*.npy
+homography_matrix.npy
+
+# ==========================================
+# Python Virtual Environment & Caches
+# ==========================================
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.egg-info/
+*.egg-info/
+.eggs/
+dist/
+
+# ==========================================
+# OS & IDE Clutter
+# ==========================================
+.DS_Store
+.vscode/
+.idea/
+*.sw

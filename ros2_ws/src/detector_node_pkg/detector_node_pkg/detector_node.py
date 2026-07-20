@@ -68,6 +68,13 @@ class DetectorNode(Node):
             'detection_results',
             10
         )
+
+        # [추가] 바운딩 박스가 그려진 디버깅용 이미지 토픽 발행자 생성
+        self.image_publisher_ = self.create_publisher(
+            Image,
+            'detection/image_raw',
+            10
+        )
         
         self.get_logger().info('객체 탐지 노드 시작됨')
 
@@ -99,6 +106,19 @@ class DetectorNode(Node):
         
         # 4. 탐지 결과 발행
         self.publisher_.publish(detection_msg)
+
+
+        # [추가] YOLO 결과를 이미지 위에 그리고 시각화 토픽으로 발행
+        if results and len(results) > 0:
+            # YOLO가 제공하는 자동 렌더링(바운딩 박스 + 라벨 그리기) 기능 호출
+            annotated_frame = results[0].plot()
+            
+            # 그려진 OpenCV 이미지를 다시 ROS2 Image 메시지로 변환
+            annotated_msg = self.cv2_to_imgmsg(annotated_frame, msg.header)
+            
+            # 이미지 토픽 송출!
+            self.image_publisher_.publish(annotated_msg)
+
         
         # 탐지된 객체 상세 로깅
         for i, det in enumerate(detection_msg.detections):
@@ -149,6 +169,18 @@ class DetectorNode(Node):
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         
         return img
+    
+    # [추가] OpenCV 이미지를 부드럽게 ROS2 이미지 장부로 변환해주는 순정 함수
+    def cv2_to_imgmsg(self, img, header):
+        msg = Image()
+        msg.header = header
+        msg.height = img.shape[0]
+        msg.width = img.shape[1]
+        msg.encoding = 'bgr8'
+        msg.is_bigendian = 0
+        msg.step = img.shape[1] * 3
+        msg.data = img.tobytes()
+        return msg
 
     def convert_to_detection_msg(self, results, header):
         """
