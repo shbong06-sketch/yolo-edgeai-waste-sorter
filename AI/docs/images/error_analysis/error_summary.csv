@@ -1,0 +1,21 @@
+image,error_type,count,classes
+dataset_000001,FP,1,Can
+dataset_000006,FP,1,Styrofoam
+dataset_000017,FP,1,Can
+dataset_000018,FP,1,Pet bottle
+dataset_000024,FP,1,Can
+dataset_000026,FP,1,Can
+dataset_000033,FP,1,Pet bottle
+dataset_000035,FP,1,Styrofoam
+dataset_000037,FP,1,Pet bottle
+dataset_000045,FP,1,Can
+dataset_000005,FN,2,"Can,Can"
+dataset_000007,FN,1,Pet bottle
+dataset_000009,FN,1,Can
+dataset_000011,FN,5,"Pet bottle,Pet bottle,Pet bottle,Pet bottle,Pet bottle"
+dataset_000012,FN,9,"Pet bottle,Pet bottle,Pet bottle,Pet bottle,Pet bottle,Pet bottle,Pet bottle,Pet bottle,Pet bottle"
+dataset_000018,FN,1,Pet bottle
+dataset_000019,FN,1,Can
+dataset_000022,FN,1,Styrofoam
+dataset_000026,FN,1,Can
+dataset_000029,FN,8,"Pet bottle,Pet bottle,Pet bottle,Pet bottle,Pet bottle,Pet bottle,Pet bottle,Pet bottle"
