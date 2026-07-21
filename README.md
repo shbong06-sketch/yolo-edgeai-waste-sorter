@@ -23,42 +23,71 @@
 
 ---
 
-## ⚙️ 시스템 아키텍처 & 흐름도 (Architecture)
+## ⚙️ 연결 다이어그램
 
-### [ 데이터/학습 파이프라인 (Offline) ]
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Node] /camera_node  (Package: camera_node_pkg)                       │
+└────────────────────────────────────────────────────────────────────────┘
+                                 │
+                                 │ [Topic]  camera/image_raw
+                                 │ [Type]   sensor_msgs/msg/Image
+                                 ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Node] /detector_node  (Package: detector_node_pkg)                   │
+└────────────────────────────────────────────────────────────────────────┘
+                                 │
+                                 │ [Topic]  detection_results
+                                 │ [Type]   vision_msgs/msg/Detection2DArray
+                                 ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Node] /robot_control_node  (Package: robot_control_node)             │
+├────────────────────────────────────────────────────────────────────────┤
+│  * 동기화: threading.Lock() 스레드 격리로 고속 프레임 레이스컨디션 차단 │
+│  * 기하학: Homography 행렬 변환 및 역기하학(IK) 수행 (L2 배율 보정)     │
+│  * 제어기: 관성 소멸 정착 대기(1.5초)를 포함한 6단계 정밀 순차 상태머신│
+└────────────────────────────────────────────────────────────────────────┘
+                    │                               ▲
+                    │                               │
+   [Action Client]  │                               │ [Topic Subscription]
+  /follower/joint_trajectory_controller/            │ /follower/joint_states
+  follow_joint_trajectory                           │ (sensor_msgs/msg/JointState)
+  (control_msgs/action/FollowJointTrajectory)       │ [실물 서보 인코더 피드백]
+                    │                               │
+                    ▼                               │
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Node] /ros2_control_node  (Package: controller_manager / so101_bringup)│
+├────────────────────────────────────────────────────────────────────────┤
+│  * 구동 하드웨어 플러그인: feetech_ros2_driver/FeetechHardwareInterface│
+│  * 역할: ROS 궤적 명령을 Feetech 스마트 서보 시리얼 프로토콜로 변환     │
+└────────────────────────────────────────────────────────────────────────┘
+                                 │
+                                 │ [Hardware Interface] USB Serial
+                                 │ [Target Port] /dev/ttyACM0
+                                 ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Hardware] SO-ARM 101 실물 로봇 암 (6자유도 Feetech 스마트 서보 구조)    │
+└────────────────────────────────────────────────────────────────────────┘
+
+# 📂 Project Structur
+
 ```text
-AIHub 데이터 수집 ──> 데이터 전처리/라벨링 ──> YOLO 모델 학습 ──> 경량화 모델 최적화 (.pt/.onnx)
+ros2_ws/
+├── src/                                 # 메인 소스코드 소스 폴더
+│   ├── camera_node_pkg/                 # 카메라 비전 스트림 송출 패킷 노드 Package
+│   ├── detector_node_pkg/               # YOLO 기반 객체 탐지 및 픽셀 좌표 추출 Package
+│   ├── robot_control_node/              # [핵심] 스레드 격리형 6단계 안전 순차 제어 노드
+│   ├── feetech_ros2_driver/             # Feetech 스마트 서보모터 하드웨어 인터페이스 드라이버
+│   └── so101-ros-physical-ai/           # SO-ARM 101 로봇 팔 통합 운용 프레임워크
+│       ├── so101_bringup/               # 실물 로봇 가동 및 비전 런칭 스크립트 (Launch, YAML)
+│       ├── so101_description/           # 로봇 URDF 모델링 및 메쉬(STL) 하드웨어 정의 파일
+│       ├── so101_kinematics/            # 기하학 연산 및 Cartesian 모션 플래너 노드
+│       ├── so101_kinematics_msgs/       # 관절 및 포즈 제어 전용 커스텀 ROS2 서비스(SRV) 정의
+│       ├── so101_moveit_config/         # MoveIt 오프라인 궤적 기획 및 충돌 방지 셋업
+│       ├── policy_server/               # VLA/ACT 모델 추론 연동 전용 gRPC/ZMQ 서버
+│       └── rosbag_to_lerobot/           # 모방 학습(Imitation Learning) 데이터셋 변환 툴
+├── make_homography.py                   # 카메라-로봇 스페이스 캘리브레이션 행렬 생성 스크립트
+└── README.md                            # 프로젝트 메인 개발 문서
 
-[ 실시간 비전-행동 제어 루프 (Online) ]
-Plaintext
-컨베이어 벨트 구동 ──> 비전 카메라 스트리밍 ──> 이미지 프레임 입력 ──> YOLO 객체 탐지
-                                                                          │ (클래스, 2D 좌표)
-수거함 배치 완료 <── ROS2 로봇 팔 제어 <── 3D 공간 좌표 변환 (Homography) <──┘
-하드웨어 및 소프트웨어 통합 레이어
-레이어 (Layer)	구성 요소	데이터 흐름 및 역할
-1. 입력단 (Input)	컨베이어 벨트, RGB 비전 카메라	벨트 위로 이동하는 폐기물 영상을 실시간(FPS)으로 캡처하여 스트리밍 데이터로 전송
-2. 인지단 (Perception)	PC / 에지 디바이스 (YOLO Engine)	입력된 프레임에서 [금속 캔, 페트병, 스티로폼]을 탐지하고, 바운딩 박스의 중심점 픽셀 좌표 (x, y) 추출
-3. 제어단 (Control)	좌표 변환 모듈, ROS2 프레임워크	카메라 2D 픽셀 좌표 (x, y)를 로봇 작업 공간의 3D 물리 좌표 (X, Y, Z)로 변환 후, 로봇 역기하학(Inverse Kinematics) 기반 궤적 생성
-4. 구동단 (Action)	SO-ARM 101 마니퓰레이터	생성된 궤적을 따라 그리퍼를 이동하여 타겟을 집고(Gripping), 지정된 쓰레기 수거함 위치로 이동 및 분류
-```
-
-## 📂 프로젝트 구조 (Repository Structure)
-
-```Plaintext
-📦 yolo-edgeai-waste-sorter
- ┣ 📂 .github              # GitHub Actions 및 issue/PR 템플릿
- ┣ 📂 ai                   # 1. AI 모델 관련 (데이터 전처리, 학습, 추론)
- ┃ ┣ 📂 configs            # YOLO 학습 설정 파일 (data.yaml 등)
- ┃ ┣ 📂 src                # AI 핵심 소스 코드 (preprocess, train, inference)
- ┃ ┗ 📜 requirements.txt   # AI 패키지 의존성 파일 (PyTorch, Ultralytics 등)
- ┣ 📂 ros2_ws              # 2. 로봇 제어 관련 (ROS2 워크스페이스)
- ┃ ┗ 📂 src
- ┃   ┣ 📂 waste_sorting_bringup   # 전체 노드 실행 및 Launch 파일 패키지
- ┃   ┣ 📂 waste_detector_node     # YOLO 추론 결과를 받아 토픽으로 발행하는 노드
- ┃   ┗ 📂 robot_control_node      # 좌표 변환(Homography) 및 로봇 팔(IK) 제어 노드
- ┣ 📂 docs                 # 3. 문서 및 산출물 관리
- ┃ ┗ 📜 project_report.md  # 최종 수행 보고서
- ┗ 📜 .gitignore           # 대용량 데이터셋 및 모델 가중치(.pt, .onnx) 제외 설정
  ```
 
 ## 📊 데이터셋 (Dataset)
@@ -101,17 +130,43 @@ conda create -n env_sorter_ai python=3.10 -y
 conda activate env_sorter_ai
 
 # 의존성 패키지 설치
+pip install --upgrade pip
 pip install -r requirements.txt
 2. ROS2 로봇 제어 환경 설정 (Ubuntu 네이티브 환경 추천)
 ```
 ```Bash
-# ROS2 워크스페이스 이동 및 언더레이 소싱
+# ROS2 ROS 2 워크스페이스 빌드
 cd ros2_ws
-source /opt/ros/humble/setup.bash  # 혹은 본인 ROS2 버전명
+source /opt/ros/jazzy/setup.bash  # 혹은 본인 ROS2 버전명
 
 # 빌드 및 패키지 환경 적용
-colcon build
+colcon build --symlink-install
 source install/setup.bash
+```
+
+실행 방법 (Execution Guide)
+
+```Bash
+# [모든 터미널 공통 사전 실행 명령]
+cd ~/yolo-edgeai-waste-sorter/ros2_ws
+source /.venv/bin/activate
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+# 1. 카메라 노드 구동 (Terminal 1)
+ros2 run camera_node_pkg camera_node
+
+# 2. YOLO 객체 탐지 노드 구동 (Terminal 2)
+ros2 run camera_node_pkg camera_node
+
+# 3. 로봇 하드웨어 & 비전 드라이버 런칭 (Terminal 3)
+ros2 launch so101_bringup follower_vision.launch.py
+
+# 4. 순차 제어 노드 구동 (Terminal 4)
+ros2 run robot_control_node robot_control_node
+
+# 5. [선택] 실시간 비전 모니터링 (Terminal 5)
+ros2 run rqt_image_view rqt_image_view
 ```
 
 ## 👥 팀원 및 역할 분배 (Team & Roles)
