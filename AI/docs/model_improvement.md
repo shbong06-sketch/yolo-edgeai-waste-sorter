@@ -9,7 +9,7 @@
 | 모델 | yolo11n.pt (최종 선정) |
 | 사전학습 가중치 | ImageNet pretrained |
 | 가중치 크기 | 5.2 MB |
-| 가중치 경로 | `runs/detect/runs/train_full/yolo11n/weights/best.pt` |
+| 가중치 경로 | `runs/detect/runs/exp01/hnm_training/weights/best.pt` |
 
 ### Hyperparameters
 
@@ -219,13 +219,14 @@ python AI/src/analysis/error_analysis.py --model <모델_경로> --conf 0.5 --io
 - HNM 데이터셋은 관련 논문에서 성능 향상이 검증되었으므로 활용
 - HNM 적용 상태에서 증강 기법을 각기 다르게 적용하여 최적 조합 도출
 
-| 실험 | 내용 | 목적 |
-|---|---|---|
-| Exp01 | Baseline + HNM | HNM 효과 검증 (논문 근거 확인) |
-| Exp02-1 | HNM + copy_paste | copy_paste 효과 확인 |
-| Exp02-2 | HNM + MixUp | MixUp 효과 확인 |
-| Exp02-3 | HNM + hsv(색상) 증강 | hsv 증강 효과 확인 |
-| Exp02-4 | HNM + translate 감소 | translate 감소 효과 확인 |
+| 실험 | 파라미터 | 기본값 | 테스트 값 | 비고 |
+| --- | --- | --- | --- | --- |
+| Exp02-1 | shear | 0.0 | 5.0 ~ 15.0 | 형태 변형 |
+| Exp02-2 | mixup | 0.0 | 0.1 ~ 0.3 | 두 이미지 블렌딩 |
+| Exp02-3 | hsv_h| 0.015 | 0.05 ~ 0.25 (0.05 간격으로 실험) | 색상 조정 |
+| Exp02-4 | hsv_s | 0.7 | 0.5, 0.7, 1.0 | 채도 조정 |
+| Exp02-5 | hsv_v | 0.4 | 0.3, 0.6 | 밝기 조정 |
+| Exp02-6 | translate | 0.1 | 0.0, 0.05, 1.0 | 번역 감소 |
 | Exp03 | HNM + 개선된 증강 조합 | 최적 조합 도출 (2차 실험) |
 
 
@@ -234,61 +235,90 @@ python AI/src/analysis/error_analysis.py --model <모델_경로> --conf 0.5 --io
 - **목적**: HNM 데이터셋으로 재학습하여 분류 정확도 향상 확인
 - **방법**: 
   - HNM 데이터셋으로 재학습 (하이퍼파라미터 동일)
-  - 원본 데이터셋 vs HNM 데이터셋 성능 비교
-- **결과**: (실험 수행 후 기록)
-- **분석**: (실험 수행 후 기록)
+  - Baseline vs HNM 데이터셋 성능 비교
+- **결과**: **mAP50-95: 0.898** (Baseline 대비 +11.3%)
+- **분석**: 모든 지표에서 10% 이상 개선, 특히 Pet bottle 클래스 개선 폭이 큼
 
 #### HNM Dataset 정보
 
-| Class | FP | FN | Total |
-|---|---|---|---|
-| Can | 116 | 137 | 253 |
-| Pet bottle | 209 | 522 | 731 |
-| Styrofoam | 178 | 206 | 384 |
-|---|---|---|---|
-| Total | 503 | 865 | 1368 |
+| 항목 | 값 |
+|---|---|
+| Train Images | 843 |
+| Val Images | 2000 |
+| 클래스별 객체 분포 | Can: 469, Pet bottle: 908, Styrofoam: 909 |
+| 구조 | images/train, images/val |
 
-### Exp02: 증강 기법별 실험
+#### 결과 비교
+
+| 지표 | Baseline | Exp01 | 개선율 |
+|---|---|---|---|
+| Precision | 0.8121 | 0.918 | +13.0% |
+| Recall | 0.8164 | 0.897 | +9.9% |
+| mAP50 | 0.8719 | 0.957 | +9.8% |
+| mAP50-95 | 0.8066 | 0.898 | +11.3% |
+
+#### 클래스별 결과
+
+| Class | Precision | Recall | mAP50 | mAP50-95 |
+|---|---|---|---|---|
+| Can | 0.905 | 0.903 | 0.951 | 0.878 |
+| Pet bottle | 0.918 | 0.911 | 0.961 | 0.897 |
+| Styrofoam | 0.927 | 0.880 | 0.958 | 0.919 |
+| **All** | **0.917** | **0.898** | **0.957** | **0.898** |
+
+### Exp02: 증강 기법별 실험 (취소)
 
 - **목적**: HNM 데이터셋 기반으로 증강 기법별 성능 영향 확인
-- **비교 대상**: Exp01 결과 (HNM 적용 Baseline)
-- **공통 조건**: 하이퍼파라미터 동일, Epoch 100
+- **취소 사유**: Exp01 성능이 기대 이상으로 충분하여 Exp02 진행하지 않음
+- **원래 계획**: shear, mixup, hsv, translate 등 19회 실험 예정
 
-#### Exp02-1: copy_paste 적용
-
-- **방법**: copy_paste 증강 적용
-- **결과**: (실험 수행 후 기록)
-- **분석**: (실험 수행 후 기록)
-
-#### Exp02-2: MixUp 적용
-
-- **방법**: MixUp 증강 적용
-- **결과**: (실험 수행 후 기록)
-- **분석**: (실험 수행 후 기록)
-
-#### Exp02-3: hsv(색상) 증강 적용
-
-- **방법**: hsv(색상) 증강 적용
-- **결과**: (실험 수행 후 기록)
-- **분석**: (실험 수행 후 기록)
-
-#### Exp02-4: translate 감소 적용
-
-- **방법**: translate 감소 적용
-- **결과**: (실험 수행 후 기록)
-- **분석**: (실험 수행 후 기록)
-
-### Exp03: 증강 조합 실험
+### Exp03: 증강 조합 실험 (취소)
 
 - **목적**: Exp02에서 개선된 증강을 조합하여 최적 성능 도출
-- **선정 기준**: Exp02 결과에서 성능 개선이 확인된 증강 기법 조합
-- **방법**: 선정된 증강 조합 적용하여 재학습
-- **결과**: (실험 수행 후 기록)
-- **분석**: (실험 수행 후 기록)
-
-
-
+- **취소 사유**: Exp02 취소로 인해 Exp03도 진행하지 않음
 
 ---
 
-## 7. Lessons Learned
+## 7. Final Model
+
+### 최종 모델 정보
+
+| 항목 | 값 |
+|---|---|
+| 모델 | yolo11n |
+| 가중치 | runs/detect/runs/exp01/hnm_training/weights/best.pt |
+| 가중치 크기 | 5.5 MB |
+| 학습 데이터 | HNM 데이터셋 (843장) |
+| 검증 데이터 | 원본 val set (2000장) |
+
+### 최종 성능
+
+| 지표 | 값 |
+|---|---|
+| Precision | 0.917 |
+| Recall | 0.898 |
+| mAP50 | 0.957 |
+| mAP50-95 | 0.898 |
+
+### 클래스별 성능
+
+| Class | Precision | Recall | mAP50 | mAP50-95 |
+|---|---|---|---|---|
+| Can | 0.905 | 0.903 | 0.951 | 0.878 |
+| Pet bottle | 0.918 | 0.911 | 0.961 | 0.897 |
+| Styrofoam | 0.927 | 0.880 | 0.958 | 0.919 |
+
+### 학습 조건
+
+| 항목 | 값 |
+|---|---|
+| Epoch | 100 |
+| Batch | 64 |
+| Image Size | 640 |
+| Optimizer | AdamW |
+| LR Scheduler | Cosine |
+| Warmup Epochs | 3 |
+| Early Stopping | patience=20 |
+| 학습 환경 | Google Colab T4 GPU |
+
+---
