@@ -73,8 +73,7 @@
 
 | FN samples | FP samples |
 |---|---|
-| ![FN_error_samplecases](./images/error_analysis/fn_montage.jpg) | ![FP_error_samplecases](./images/error_analysis/fp_montage.jpg)
- |
+| ![FN_error_samplecases](./images/error_analysis/fn_montage.jpg) | ![FP_error_samplecases](./images/error_analysis/fp_montage.jpg) |
 | 미탐지 샘플 - FN 대표 이미지 (파란색 바운딩 박스) | 오탐지 샘플 - FP 대표 이미지 (빨간색 바운딩 박스) |
 
 #### 분석 내용
@@ -265,6 +264,12 @@ python AI/src/analysis/error_analysis.py --model <모델_경로> --conf 0.5 --io
 | Pet bottle | 0.918 | 0.911 | 0.961 | 0.897 |
 | Styrofoam | 0.927 | 0.880 | 0.958 | 0.919 |
 | **All** | **0.917** | **0.898** | **0.957** | **0.898** |
+
+#### 혼동행렬
+![confusion_matrix](./images/exp01_confusion_matrix.png)
+
+#### PR Curve
+![pr_curve](./images/exp01_PR_curve.png)
 
 ### Exp02: 증강 기법별 실험 (취소)
 
