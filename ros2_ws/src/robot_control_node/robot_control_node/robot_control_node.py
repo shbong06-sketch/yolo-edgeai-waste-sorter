@@ -136,6 +136,7 @@ class RobotControlNode(Node):
                     robot_x, robot_y = self.convert_pixel_to_robot_space(u, v)
                     robot_z = 20.0  
                     
+                    # 자가 오탐 및 가동 범위 외 예외 처리
                     if not (120.0 <= robot_x <= 400.0 and -250.0 <= robot_y <= 250.0):
                         return 
                     
