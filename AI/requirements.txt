@@ -5,3 +5,4 @@ matplotlib
 pandas
 PyYAML
 pillow
+onnxruntime>=1.17.0
