@@ -38,6 +38,24 @@ best_int8.onnx (ONNX INT8)
 
 CPU 환경 기준 (Intel/AMD)
 
+
+> INT8 양자화 모델은 `onnxruntime` CPU에서 `ConvInteger` 미지원으로 벤치마크 불가.
+
+## ROS2 Pipeline Benchmark
+
+실시간 카메라 파이프라인에서 측정 (카메라노드 -> 탐지 노드 각각 실행)
+
+### Topic Statistics
+
+| Topic | Hz(avg) | BW(KB/s) |
+|---|---|---|
+| /camera/image_raw(best.pt) | 24.20 | 22.63e3 |
+| /detection(best.pt) | 19.27 | 697.2 |
+| /camera/image_raw(best.onnx) | 7.484 | 5760 |
+| /detection(best.onnx) | 20.71 | 1.56 |
+
+### Inference Latency (노드 내부 측정)
+
 | Model | Inference (ms) | FPS | Size (MB) |
 |-------|---------------|-----|-----------|
 | PyTorch (.pt) | 59.47 | 16.8 | 5.21 |
@@ -45,8 +63,6 @@ CPU 환경 기준 (Intel/AMD)
 
 - **ONNX Speedup**: 2.18x (PyTorch 대비)
 - **Trade-off**: ONNX는 추론 속도 2.2배 향상, 파일 크기 2배 증가
-
-> INT8 양자화 모델은 `onnxruntime` CPU에서 `ConvInteger` 미지원으로 벤치마크 불가.
 
 ---
 
