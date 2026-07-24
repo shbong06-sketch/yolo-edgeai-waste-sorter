@@ -20,17 +20,22 @@ class RobotControlNode(Node):
     def __init__(self):
         super().__init__('robot_control_node')
         
-        self.declare_parameter('target_class', 'can')
+        self.declare_parameter('target_class', ['can', 'pet bottle', 'styrofoam'])
         self.target_class = self.get_parameter('target_class').value
+        # homography_matrix.npy 경로
         
-        # 캘리브레이션 행렬 로드
-        npy_path = '/home/gt/yolo-edgeai-waste-sorter/AI/src/inference/homography_matrix.npy'
+        self.declare_parameter('homography_path', 'homography_matrix.npy')
+        npy_path = self.get_parameter('homography_path').value
+        
+        # 3. 캘리브레이션 행렬 로드
         try:
             self.H = np.load(npy_path)
-            self.get_logger().info('캘리브레이션 행렬 파일 로드 완료!')
+            self.get_logger().info(f'캘리브레이션 행렬 파일 로드 완료! (경로: {npy_path})')
         except FileNotFoundError:
             self.get_logger().error(f'행렬 파일을 찾을 수 없습니다: {npy_path}')
             raise SystemExit
+
+        
         
         self.main_cb_group = ReentrantCallbackGroup()
         
@@ -63,7 +68,7 @@ class RobotControlNode(Node):
         self.offset_flex1 = 4.535981189777841     
         self.offset_flex2 = 4.512971477959557   
         
-        # 2. 스마트폰 실측 기반 기하학 기준점 동기화
+        # 2.실측 기반 기하학 기준점 동기화
         self.home_math_lift  = -0.1745     
         self.home_math_flex1 = -3.0543   
         
@@ -129,7 +134,18 @@ class RobotControlNode(Node):
 
             for detection in msg.detections:
                 class_name = detection.results[0].hypothesis.class_id
-                if class_name.strip().lower() == self.target_class.strip().lower():
+
+                # YOLO가 감지한 클래스 이름 정제 (공백 제거 및 소문자화)
+                clean_class_name = class_name.strip().lower()
+
+                # self.target_class 가 리스트인지 단일 문자열인지 둘 다 대응하도록 안전 처리
+                if isinstance(self.target_class, list):
+                    target_list = [c.strip().lower() for c in self.target_class]
+                else:
+                    target_list = [str(self.target_class).strip().lower()]
+                
+                # 감지된 객체가 목표 리스트 안에 들어있는지 확인 (in 연산자)
+                if clean_class_name in target_list:
                     u = detection.bbox.center.position.x
                     v = detection.bbox.center.position.y
                     
@@ -254,13 +270,13 @@ class RobotControlNode(Node):
 
         elif self.current_state == "LIFT_AND_MOVE":
             self.current_state = "RELEASE"
-            self.get_logger().info(" 🗑 [ACTION] ➔ RELEASE 시작 (집게 열기 및 폐기물 배출)")
+            self.get_logger().info("  [ACTION] ➔ RELEASE 시작 (집게 열기 및 폐기물 배출)")
             home_target = [self.offset_pan, self.offset_lift, self.offset_flex1, self.offset_flex2, self.wrist_roll_val, self.gripper_open]
             self.send_trajectory_action_goal(home_target, travel_time_sec=2.0)
 
         elif self.current_state == "RELEASE":
             self.current_state = "COOL_DOWN"
-            self.get_logger().info(" ⏳ [SYSTEM COOL_DOWN] 안전을 위해 3초간 비전 차단...")
+            self.get_logger().info(" [SYSTEM COOL_DOWN] 안전을 위해 3초간 비전 차단...")
             self.cool_down_timer = self.create_timer(3.0, self.reset_to_idle, callback_group=self.main_cb_group)
 
     def transition_to_approach_3(self):
