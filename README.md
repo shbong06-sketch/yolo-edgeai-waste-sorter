@@ -158,7 +158,7 @@ source install/setup.bash
 ros2 run camera_node_pkg camera_node
 
 # 2. YOLO 객체 탐지 노드 구동 (Terminal 2)
-ros2 run camera_node_pkg camera_node
+ros2 run detector_node_pkg detector_node
 
 # 3. 로봇 하드웨어 & 비전 드라이버 런칭 (Terminal 3)
 ros2 launch so101_bringup follower_vision.launch.py
