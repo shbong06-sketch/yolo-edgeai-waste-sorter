@@ -221,8 +221,8 @@ class OnnxEngine:
         self.output_names = [o.name for o in self.session.get_outputs()]
 
     def _logger_info(self, msg: str):
-        """간단한 로깅 (ROS2 노드 외부 호출 시 대비)."""
-        print(f'[OnnxEngine] {msg}')
+        """ROS2 노드 외부 호출 시 대비 (현재는 no-op)."""
+        pass
 
     def predict(
         self, frame: np.ndarray, conf: float = 0.5, iou: float = 0.45

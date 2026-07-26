@@ -206,6 +206,11 @@ best_int8.onnx (ONNX INT8)
                                               [추론 스레드] → 추론 실행 → 결과 발행
 ```
 
+- **image_callback**: 프레임 저장만 수행 (빠른 반환), 추론 중이면 스킵
+- **추론 스레드**: `_inference_loop()` — 이벤트 기반, 최신 프레임만 처리
+- **스레드 안전성**: `_busy` 플래그 + `threading.Lock`으로 경쟁 조건 방지
+- **executor**: `MultiThreadedExecutor`로 멀티스레드 콜백 그룹 지원
+
 | Topic | Hz(avg) | BW |
 |---|---|---|
 | /camera/image_raw(best.pt) | 10.037 | 9.21 (MB/s) |
@@ -213,13 +218,58 @@ best_int8.onnx (ONNX INT8)
 | /camera/image_raw(best.onnx) | 11.032 | 11.92 (MB/s) |
 | /detection_results(best.onnx) | 11.678 | 0.37 (KB/s) |
 
-- **image_callback**: 프레임 저장만 수행 (빠른 반환), 추론 중이면 스킵
-- **추론 스레드**: `_inference_loop()` — 이벤트 기반, 최신 프레임만 처리
-- **스레드 안전성**: `_busy` 플래그 + `threading.Lock`으로 경쟁 조건 방지
-- **executor**: `MultiThreadedExecutor`로 멀티스레드 콜백 그룹 지원
+- 기대 대비 성능 악화
+    - 모든 케이스에서 카메라와 탐지 Hz 감소
+- 원인 추정
+    1. 스레드 오버헤드 의심(Lock, Event, Thread 생성, 관리 비용 추가)
+    2. 카메라 노드 병목
 
-### OPT04. detection node 개선 - ONNX 직접 로드(onnxruntime)
+### OPT04. detection node 개선3 - 스레드 안전성 및 최적화
 
+`detector_node.py` - 레이스 컨디션 수정 + 메모리 관리 + 7개 항목 최적화
+
+#### 변경 사항
+
+| 항목 | Before | After |
+|------|--------|-------|
+| 상태 전이 순서 | `busy=False → frame=None` (해제 후 초기화로 인해 1번과 2번 사이에 이미지 콜백이 들어오면 프레임 유실 위험) | `frame=None → busy=False` (안전) |
+| 메모리 관리 | `np.frombuffer()` (읽기 전용 뷰, 연속적이지 않은 메모리 가능성 존재. cv2.cvtColor() 등 추가 연산 시 내부적 복사 발생) | `np.frombuffer().copy()` (쓰기 가능, C-contiguous) |
+| 이중 복사 | bgr8에서 `copy()` + `cvtColor()` | bgr8은 `copy().reshape()`만 (cvtColor 불필요) |
+| busy 체크 시점 | 변환 후 체크 | 변환 전 체크 (불필요한 변환 방지. busy 상태일 때 이미지 변환 수행하지 않음 -> CPU 자원 절약) |
+| 프레임 전달 | `threading.Event` (1개만 처리. set()과 clear() 사이 들어오는 프레임 유실 위험) | `queue.Queue(maxsize=1)` (최신 프레임 유지, 이전 프레임 자동 폐기 -> 프레임 유실 방지) |
+| 시간 API | `time.time()` (시스템 시간 의존) | `self.get_clock().now()` (ROS2 clock, 시간 변경 안정적으로) |
+| 메시지 변환 | 반복문 내 `append` | `_det_to_detection()` 헬퍼 메서드 분리 + 리스트 컴프리헨션 사용 |
+| imgsz 설정 | 하드코딩 `640` | `declare_parameter('imgsz', 640)` |
+
+
+#### 아키텍처
+
+```
+[카메라 노드] → image_raw → [image_callback] → busy 체크 → 변환 → Queue 저장
+                                                            ↓
+                                                    [추론 스레드] → Queue.get() → copy() → 추론 → 결과 발행
+```
+
+- **image_callback**: busy 체크 → 변환 → Queue 저장 (빠른 반환)
+- **추론 스레드**: `queue.get()`으로 프레임 수신 → `copy()`로 독립성 확보
+- **스레드 안전성**: `_busy` 플래그 + `threading.Lock` + `queue.Queue`로 경쟁 조건 방지
+- **메모리 안전성**: `.copy()`로 C-contiguous + WRITEABLE 배열 보장
+
+#### 개선 효과
+
+1. **레이스 컨디션 방지**: 프레임 초기화 → busy 해제 순서로 새 프레임 유실 방지
+2. **메모리 안전성**: `np.frombuffer().copy()`로 읽기 전용 뷰 문제 해결
+3. **CPU 효율**: busy 상태일 때 이미지 변환 수행하지 않음 (불필요한 연산 제거)
+4. **프레임 유실 방지**: Queue 기반으로 모든 프레임이 순서대로 처리
+5. **시스템 시간 독립**: ROS2 clock 사용으로 NTP 동기화 영향 제거
+6. **유지보수성**: 헬퍼 메서드 분리로 코드 가독성 향상
+
+| Topic | Hz(avg) | BW |
+|---|---|---|
+| /camera/image_raw(best.pt) | 10.529 | 8.31 (MB/s) |
+| /detection_results(best.pt) | 8.384 | 1.50 (KB/s) |
+| /camera/image_raw(best.onnx) | 18.810 | 0.92 (MB/s) |
+| /detection_results(best.onnx) | 19.500 | 6.05 (KB/s) |
 
 ### Final Benchmark
 

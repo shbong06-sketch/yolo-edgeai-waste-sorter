@@ -4,8 +4,8 @@ YOLO 기반 객체 탐지 ROS2 노드.
 프레임 스킵과 멀티스레드 아키텍처를 통해 실시간 추론을 지원
 """
 
+import queue
 import threading
-import time
 
 import cv2
 import numpy as np
@@ -38,6 +38,7 @@ class DetectorNode(Node):
     - ~conf_threshold: 탐지 신뢰도 임계값 (0.0 ~ 1.0)
     - ~iou_threshold: NMS IoU 임계값
     - ~device: 추론 디바이스 ("cpu" 또는 "cuda")
+    - ~imgsz: 추론 입력 이미지 크기 (기본값: 640)
 
     추론 엔진 분기 (EngineFactory):
     - .pt 파일 → YoloEngine (ultralytics YOLO 사용)
@@ -45,9 +46,9 @@ class DetectorNode(Node):
 
     멀티스레드 아키텍처:
     - 메인 스레드: rclpy executor spinning (기타 콜백 처리)
-    - 이미지 콜백: 최신 프레임만 저장 (빠른 반환)
-    - 추론 스레드: 백그라운드에서 추론 실행 및 결과 발행
-    - 프레임 스킵: 추론 중 새 프레임은 자동 스킵 (latest-frame 방식)
+    - 이미지 콜백: busy 체크 → 변환 → Queue 저장 (빠른 반환)
+    - 추론 스레드: Queue.get() → copy() → 추론 → 결과 발행
+    - 프레임 스킵: 추론 중 새 프레임은 자동 스킵 (Queue maxsize=1)
     """
 
     def __init__(self):
@@ -55,30 +56,31 @@ class DetectorNode(Node):
         super().__init__('detector_node')
 
         # ── 1. 파라미터 선언 및 설정 ──
-        self.declare_parameter('model_path', 'best.pt')
+        self.declare_parameter('model_path', 'best.onnx')
         self.declare_parameter('conf_threshold', 0.5)
         self.declare_parameter('iou_threshold', 0.45)
         self.declare_parameter('device', 'cuda')
+        self.declare_parameter('imgsz', 640)
 
         self.model_path = self.get_parameter('model_path').value
         self.conf_threshold = self.get_parameter('conf_threshold').value
         self.iou_threshold = self.get_parameter('iou_threshold').value
         self.device = self.get_parameter('device').value
+        self.imgsz = self.get_parameter('imgsz').value
 
         # ── 2. 추론 엔진 초기화 ──
         self.get_logger().info(f'모델 로딩: {self.model_path}')
         self.engine = EngineFactory.create(
-            self.model_path, device=self.device, imgsz=640
+            self.model_path, device=self.device, imgsz=self.imgsz
         )
         self.get_logger().info(f'추론 디바이스: {self.device}')
 
         # ── 3. 프레임 스킵 상태 ──
         # _busy: 추론 스레드가 실행 중이면 True → 새 프레임 스킵
         self._busy = False
-        # _latest_frame: 가장 최신 프레임 (추론 스레드가 읽음)
-        self._latest_frame = None
-        self._latest_header = None
         self._frame_lock = threading.Lock()
+        # 프레임 큐: 최신 프레임 1개만 유지 (이전 프레임 자동 폐기)
+        self._frame_queue = queue.Queue(maxsize=1)
         # 프레임 스킵 카운터 (로깅용)
         self._frames_received = 0
         self._frames_skipped = 0
@@ -107,7 +109,7 @@ class DetectorNode(Node):
         self._log_timer = self.create_timer(
             1.0, self._log_summary, callback_group=self._sub_group
         )
-        self._log_timer_start = time.time()
+        self._log_timer_start = self.get_clock().now()
 
         # ── 7. 추론 스레드 시작 ──
         # 추론 루프를 백그라운드 스레드로 설정
@@ -115,7 +117,6 @@ class DetectorNode(Node):
             target=self._inference_loop, daemon=True
         )
 
-        self._inference_event = threading.Event()   # 스레드 간 신호 전달용 이벤트 객체
         self._running = True    # 루프 종료 플래그(False 되면 탈출)
         self._inference_thread.start()  # inference loop 병렬 실행
 
@@ -134,6 +135,12 @@ class DetectorNode(Node):
         - 추론 스레드가 실행 중(_busy=True)이면 새 프레임을 스킵
         - 추론 스레드가 대기 중이면 최신 프레임으로 교체
         """
+        # busy 체크: 변환 전에 수행하여 불필요한 변환 방지 (CPU 절약)
+        with self._frame_lock:
+            if self._busy:
+                self._frames_skipped += 1
+                return
+
         # ROS2 Image → OpenCV 변환
         frame = self._imgmsg_to_cv2(msg)
         if frame is None:
@@ -141,17 +148,12 @@ class DetectorNode(Node):
 
         self._frames_received += 1
 
-        # 프레임 스킵: 추론 중이면 새 프레임 무시
-        with self._frame_lock:
-            if self._busy:
-                self._frames_skipped += 1
-                return
-            # 추론 대기 중이면 최신 프레임으로 교체
-            self._latest_frame = frame
-            self._latest_header = msg.header
-
-        # 추론 스레드에 처리 신호 전달
-        self._inference_event.set()
+        # 프레임 큐에 저장 (maxsize=1, 이전 프레임 자동 폐기)
+        try:
+            self._frame_queue.get_nowait()
+        except queue.Empty:
+            pass
+        self._frame_queue.put_nowait((frame, msg.header))
 
     #  추론 스레드 (백그라운드 실행)
 
@@ -159,27 +161,24 @@ class DetectorNode(Node):
         """
         추론 스레드 메인 루프.
 
-        이미지 콜백이 set()한 이벤트를 기다리다가,
-        최신 프레임에 대해 추론을 실행하고 결과를 발행.
+        Queue에서 프레임을 가져와 추론을 실행하고 결과를 발행.
 
         스레드 안전성:
         - _busy 플래그로 콜백과 추론 스레드 간 경쟁 조건 방지
-        - _frame_lock으로 _latest_frame/_latest_header 보호
+        - queue.Queue로 프레임 전달 (최신 프레임 1개 유지)
         - onnxruntime 세션은 단일 스레드에서만 호출되므로 안전
         """
         while self._running:
-            # 새 프레임 신호 대기 (1초 타임아웃으로 _running 체크)
-            self._inference_event.wait(timeout=1.0)
-            if not self._running:
-                break
-            self._inference_event.clear()
+            try:
+                # Queue에서 프레임 수신 (1초 타임아웃으로 _running 체크)
+                frame, header = self._frame_queue.get(timeout=1.0)
+            except queue.Empty:
+                continue
 
-            # 프레임 복사 (lock 유지 시간 최소화)
+            # 프레임 복사 (독립 배열 확보: C-contiguous + WRITEABLE)
+            frame = frame.copy()
+
             with self._frame_lock:
-                frame = self._latest_frame
-                header = self._latest_header
-                if frame is None:
-                    continue
                 self._busy = True
 
             try:
@@ -196,11 +195,9 @@ class DetectorNode(Node):
                 self.get_logger().error(f'추론 오류: {e}')
 
             finally:
-                # 추론 완료 → 콜백이 새 프레임을 받을 수 있음
+                # 추론 완료 → frame=None 먼저 초기화 후 busy 해제 (race condition 방지)
                 with self._frame_lock:
                     self._busy = False
-                    self._latest_frame = None
-                    self._latest_header = None
 
     #  요약 로깅 (1초 간격)
 
@@ -213,7 +210,8 @@ class DetectorNode(Node):
         - 스킵된 프레임 수
         - 스킵 비율
         """
-        elapsed = time.time() - self._log_timer_start
+        now = self.get_clock().now()
+        elapsed = (now - self._log_timer_start).nanoseconds / 1e9
         if elapsed < 1.0:
             return
 
@@ -230,7 +228,7 @@ class DetectorNode(Node):
         # 카운터 리셋
         self._frames_received = 0
         self._frames_skipped = 0
-        self._log_timer_start = time.time()
+        self._log_timer_start = now
 
     #  이미지 변환
 
@@ -263,8 +261,8 @@ class DetectorNode(Node):
             self.get_logger().warn(f'지원하지 않는 인코딩: {msg.encoding}')
             return None
 
-        # numpy 배열로 변환
-        img = np.frombuffer(msg.data, dtype=dtype)  # 읽기 전용 : 복사 과정 절약
+        # numpy 배열로 변환 (copy로 C-contiguous + WRITEABLE 보장)
+        img = np.frombuffer(msg.data, dtype=dtype).copy()
         img = img.reshape((msg.height, msg.width, channels))
 
         # RGB인 경우 BGR로 변환 (OpenCV는 BGR 사용)
@@ -272,6 +270,34 @@ class DetectorNode(Node):
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         return img
+
+    def _det_to_detection(self, det: dict) -> Detection2D:
+        """
+        단일 탐지 결과(dict)를 Detection2D 메시지로 변환.
+
+        Args:
+            det: {"class_name": str, "confidence": float,
+                  "bbox": [x1, y1, x2, y2]}
+
+        Returns
+        -------
+        vision_msgs/msg/Detection2D
+
+        """
+        detection = Detection2D()
+
+        x1, y1, x2, y2 = det['bbox']
+        detection.bbox.center.position.x = (x1 + x2) / 2.0
+        detection.bbox.center.position.y = (y1 + y2) / 2.0
+        detection.bbox.size_x = x2 - x1
+        detection.bbox.size_y = y2 - y1
+
+        hypothesis = ObjectHypothesisWithPose()
+        hypothesis.hypothesis.class_id = det['class_name']
+        hypothesis.hypothesis.score = det['confidence']
+        detection.results.append(hypothesis)
+
+        return detection
 
     def _make_detection_msg(self, detections: list, header) -> Detection2DArray:
         """
@@ -292,27 +318,10 @@ class DetectorNode(Node):
 
         """
         detection_msg = Detection2DArray()
-        detection_msg.header = header  # 원본 이미지 타임스탬프 유지
-
-        for det in detections:
-            detection = Detection2D()
-
-            # 바운딩박스 좌표 (좌상단 x1,y1 → 우하단 x2,y2)
-            x1, y1, x2, y2 = det['bbox']
-
-            # 중심점과 크기 계산 (BoundingBox2D 형식)
-            detection.bbox.center.position.x = (x1 + x2) / 2.0
-            detection.bbox.center.position.y = (y1 + y2) / 2.0
-            detection.bbox.size_x = x2 - x1
-            detection.bbox.size_y = y2 - y1
-
-            # 클래스 이름 및 신뢰도
-            hypothesis = ObjectHypothesisWithPose()
-            hypothesis.hypothesis.class_id = det['class_name']
-            hypothesis.hypothesis.score = det['confidence']
-            detection.results.append(hypothesis)
-
-            detection_msg.detections.append(detection)
+        detection_msg.header = header
+        detection_msg.detections = [
+            self._det_to_detection(det) for det in detections
+        ]
 
         return detection_msg
 
@@ -339,7 +348,6 @@ def main(args=None):
     finally:
         # 추론 스레드 종료 대기
         detector_node._running = False
-        detector_node._inference_event.set()
         detector_node._inference_thread.join(timeout=3.0)
         detector_node.destroy_node()
         rclpy.shutdown()
