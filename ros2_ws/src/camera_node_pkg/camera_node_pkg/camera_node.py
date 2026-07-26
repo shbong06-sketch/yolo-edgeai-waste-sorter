@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 import cv2
+from rclpy.qos import qos_profile_sensor_data
 
 
 class CameraNode(Node):
@@ -49,8 +50,8 @@ class CameraNode(Node):
         self.cap.set(cv2.CAP_PROP_FPS, self.fps)
         
         # 발행자 생성
-        # queue_size=10: 버퍼 크기 (최근 10개 메시지 유지)
-        self.publisher_ = self.create_publisher(Image, 'camera/image_raw', 10)
+        # QoS : qos_profile_sensor_data
+        self.publisher_ = self.create_publisher(Image, 'camera/image_raw', qos_profile_sensor_data)
         
         # 타이머 생성 (프레임 전송 간격)
         # 1/fps초마다 publish_image 콜백 함수 실행

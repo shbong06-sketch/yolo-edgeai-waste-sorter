@@ -16,7 +16,7 @@ setup(
         'ultralytics==8.4.87',
         'opencv-python>=4.8',
         'numpy',
-        'torch',
+        'onnxruntime-gpu>=1.17.0',
     ],
     zip_safe=True,
     maintainer='shbong',
@@ -31,6 +31,7 @@ setup(
     entry_points={
         'console_scripts': [
             'detector_node = detector_node_pkg.detector_node:main',
+            'inference_engine = detector_node_pkg.inference_engine:main',
         ],
     },
 )
