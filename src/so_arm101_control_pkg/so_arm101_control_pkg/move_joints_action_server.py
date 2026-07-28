@@ -45,6 +45,7 @@ class MoveJointsActionServer(Node):
         )
 
 
+    # 액션서버 실행 콜백 - 클라이언트로부터 요청받은 위치로 IsaacSIM에게 이동명령 
     def execute_callback(self, goal_handle):
         self.get_logger().info('MoveJoints goal received')
 
@@ -61,7 +62,7 @@ class MoveJointsActionServer(Node):
             return result
 
 
-        # 축과 위치 개수 안맞으면 이상처리
+        # 축과 위치명령 이상체크 (개수)
         if len(target_state.name) != len(target_state.position):
             goal_handle.abort()
 
@@ -75,7 +76,7 @@ class MoveJointsActionServer(Node):
 
         duration_seconds = duration.sec + duration.nanosec / 1_000_000_000
 
-        # 이동시간 이상처리
+        # 이동시간 이상체크
         if duration_seconds <= 0.0:
             goal_handle.abort()
 
@@ -86,11 +87,13 @@ class MoveJointsActionServer(Node):
 
 
 
+        # 정상 데이터라 판단하고 명령 수행
 
+        # 피드백
         feedback = MoveJoints.Feedback()
 
-        steps = 20
-        sleep_time = duration_seconds / steps
+        steps = 20                              # 모션 움직임을 20단계로 과정으로 나누어 수행
+        sleep_time = duration_seconds / steps   # 모션 대기시간
 
         for step in range(steps):
             if goal_handle.is_cancel_requested:
@@ -102,10 +105,14 @@ class MoveJointsActionServer(Node):
                 result.final_state = target_state
                 return result
 
+
+
             feedback.progress = float(step + 1) / steps
             feedback.current_state = target_state
 
             goal_handle.publish_feedback(feedback)
+
+
 
             command = JointState()
             command.header.stamp = self.get_clock().now().to_msg()
