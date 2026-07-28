@@ -21,7 +21,7 @@ from vision_msgs.msg import (
     ObjectHypothesisWithPose,
 )
 
-from inference_engine import EngineFactory
+from .inference_engine import EngineFactory
 
 
 class DetectorNode(Node):
@@ -84,6 +84,10 @@ class DetectorNode(Node):
         # 프레임 스킵 카운터 (로깅용)
         self._frames_received = 0
         self._frames_skipped = 0
+        # 클래스별 탐지 결과 카운터 (로깅용)
+        self._detection_counts = {}
+        self._total_detections = 0
+        self._detection_lock = threading.Lock()
 
         # ── 4. 구독자 (MutuallyExclusiveCallbackGroup) ──
         # MutuallyExclusiveCallbackGroup: 이 그룹 내 콜백은 직렬 실행
@@ -190,6 +194,15 @@ class DetectorNode(Node):
                 detection_msg = self._make_detection_msg(detections, header)
                 self.publisher_.publish(detection_msg)
 
+                # 로깅용 클래스별 개수 저장
+                counts = {}
+                for det in detections:
+                    cls = det['class_name']
+                    counts[cls] = counts.get(cls, 0) + 1
+                with self._detection_lock:
+                    self._detection_counts = counts
+                    self._total_detections = len(detections)
+
             except Exception as e:
                 self.get_logger().error(f'추론 오류: {e}')
 
@@ -202,31 +215,30 @@ class DetectorNode(Node):
 
     def _log_summary(self):
         """
-        1초 간격으로 프레임 처리 요약 로깅.
-
-        핫패스에서 매 프레임 .info() 대신, 주기적으로:
-        - 수신 프레임 수
-        - 스킵된 프레임 수
-        - 스킵 비율
+        1초 간격으로 탐지 결과 요약 로깅.
+        - 인식한 객체 클래스별 개수 출력
         """
         now = self.get_clock().now()
         elapsed = (now - self._log_timer_start).nanoseconds / 1e9
         if elapsed < 1.0:
             return
 
-        received = self._frames_received
-        skipped = self._frames_skipped
-        processed = received - skipped
-        skip_ratio = (skipped / received * 100) if received > 0 else 0.0
+        # 클래스별 개수 출력
+        with self._detection_lock:
+            counts = self._detection_counts.copy()
+            total = self._total_detections
 
-        self.get_logger().info(
-            f'[1초 요약] 수신: {received}, 처리: {processed}, '
-            f'스킵: {skipped} ({skip_ratio:.0f}%)'
-        )
+        if counts:
+            count_str = ', '.join(f'{k} {v}' for k, v in counts.items())
+            self.get_logger().info(
+                f'[탐지] {total}개 객체 탐지 ({count_str})'
+            )
+        else:
+            self.get_logger().info('[탐지] 객체 없음')
 
         # 카운터 리셋
-        self._frames_received = 0
-        self._frames_skipped = 0
+        self._detection_counts = {}
+        self._total_detections = 0
         self._log_timer_start = now
 
     #  이미지 변환

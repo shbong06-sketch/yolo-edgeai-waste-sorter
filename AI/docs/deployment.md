@@ -81,12 +81,12 @@ best_int8.onnx (ONNX INT8)
 
 #### CPU 환경
 
-| Topic | Hz(avg) | BW(KB/s) |
+| Topic | Hz(avg) | BW |
 |---|---|---|
-| /camera/image_raw(best.pt) | 24.20 | 22.63e3 |
-| /detection_results(best.pt) | 19.27 | 697.2 |
-| /camera/image_raw(best.onnx) | 7.484 | 5760 |
-| /detection_results(best.onnx) | 20.71 | 1.56 |
+| /camera/image_raw(best.pt) | 24.20 | 22.10 (MB/s) |
+| /detection_results(best.pt) | 19.27 | 697.2 (KB/s) |
+| /camera/image_raw(best.onnx) | 7.484 | 5.625 (MB/s) |
+| /detection_results(best.onnx) | 20.71 | 1.56 (KB/s) |
 > **Note**: best.onnx 사용 시 카메라 토픽 Hz가 24.20 -> 7.484로 급락한 것은 onnxruntime 추론이 CPU 자원을 과점유하여 카메라 노드의 타이머 콜백이 지연된 것으로 추측됨.
 > (두 노드가 동일한 CPU 코어를 경쟁)
 
@@ -141,7 +141,15 @@ best_int8.onnx (ONNX INT8)
 
 ### OPT01. QoS 설정 변경
 
-`camera/image_raw` 토픽의 QoS를 `qos_profile_sensor_data`로 설정
+#### 변경사항
+
+- `camera/image_raw` 토픽의 QoS를 `qos_profile_sensor_data`로 설정
+
+#### 개선효과
+
+- 카메라 토픽은 개선, 탐지 토픽은 악화됨.
+- 카메라 Hz 증가 : 카메라 노드가 더 빠르게 프레임을 캡처하게 됨.
+- 탐지 Hz 급락 : QoS 변경이 탐지 노드의 처리 우선 순위를 낮추거나 자원 경쟁을 심화시킨 것으로 보임.
 
 | Topic | Hz(avg) | BW |
 |---|---|---|
@@ -152,24 +160,13 @@ best_int8.onnx (ONNX INT8)
 | /camera/image_raw(best_int8.onnx) | 28.111 | 26.94 (MB/s) |
 | /detection_results(best_int8.onnx) | 6.513 | 0.31 (KB/s) |
 
-- 카메라 토픽은 개선, 탐지 토픽은 악화됨.
-1. 카메라 Hz 증가 : 카메라 노드가 더 빠르게 프레임을 캡처하게 됨.
-
-2. 탐지 Hz 급락 : QoS 변경이 탐지 노드의 처리 우선 순위를 낮추거나 자원 경쟁을 심화시킨 것으로 보임.
-
 ### OPT02. detection node 개선 - ONNX 최적화 적용
 
-`inference_engine.py` 추가하여 파일 확장자에 따라 적절한 추론 엔진을 선택하여 사용하도록 개선.
+#### 변경사항
 
+- `inference_engine.py` 추가하여 파일 확장자에 따라 적절한 추론 엔진을 선택하여 사용하도록 개선.
 
-| Topic | Hz(avg) | BW |
-|---|---|---|
-| /camera/image_raw(best.pt) | 14.121 | 7.40 (MB/s) |
-| /detection_results(best.pt) | 11.542 | 1.61 (KB/s) |
-| /camera/image_raw(best.onnx) | 13.896 | 7.23 (MB/s) |
-| /detection_results(best.onnx) | 11.754 | 2.74 (KB/s) |
-| /camera/image_raw(best_int8.onnx) | 28.232 | 27.57 (MB/s) |
-| /detection_results(best_int8.onnx) | 7.028 | 0.31 (KB/s) |
+#### 개선효과
 
 1. best.onnx - 유일한 개선 모델
     - 탐지 Hz 37% 향상
@@ -185,11 +182,20 @@ best_int8.onnx (ONNX INT8)
     - 작은 모델(yolo11n)에서 동적 양자화를 사용한 한계가 보임.
     - 현재 단계에서는 탈락시키고, 향후 과제로 정적 양자화 및 calibration 데이터 적용을 고려해 봐야 할 것으로 보임.
 
+| Topic | Hz(avg) | BW |
+|---|---|---|
+| /camera/image_raw(best.pt) | 14.121 | 7.40 (MB/s) |
+| /detection_results(best.pt) | 11.542 | 1.61 (KB/s) |
+| /camera/image_raw(best.onnx) | 13.896 | 7.23 (MB/s) |
+| /detection_results(best.onnx) | 11.754 | 2.74 (KB/s) |
+| /camera/image_raw(best_int8.onnx) | 28.232 | 27.57 (MB/s) |
+| /detection_results(best_int8.onnx) | 7.028 | 0.31 (KB/s) |
+
 ### OPT03. detection node 개선2 - 프레임 스킵 + 멀티스레드 콜백
 
-`detector_node.py` - 프레임 스킵 + 멀티스레드 콜백 적용 + 매 프레임마다 로깅하던 것을 타이머 기반으로 1초 간격 요약해 로깅하도록 변경
-
 #### 변경 사항
+
+- `detector_node.py` - 프레임 스킵 + 멀티스레드 콜백 적용 + 매 프레임마다 로깅하던 것을 타이머 기반으로 1초 간격 요약해 로깅하도록 변경
 
 | 항목 | Before | After |
 |------|--------|-------|
@@ -211,6 +217,13 @@ best_int8.onnx (ONNX INT8)
 - **스레드 안전성**: `_busy` 플래그 + `threading.Lock`으로 경쟁 조건 방지
 - **executor**: `MultiThreadedExecutor`로 멀티스레드 콜백 그룹 지원
 
+#### 개선효과
+
+- 기대 대비 성능 악화 : 모든 케이스에서 카메라와 탐지 Hz 감소
+- 원인 추정
+    1. 스레드 오버헤드 의심(Lock, Event, Thread 생성, 관리 비용 추가)
+    2. 카메라 노드 병목
+
 | Topic | Hz(avg) | BW |
 |---|---|---|
 | /camera/image_raw(best.pt) | 10.037 | 9.21 (MB/s) |
@@ -218,36 +231,13 @@ best_int8.onnx (ONNX INT8)
 | /camera/image_raw(best.onnx) | 11.032 | 11.92 (MB/s) |
 | /detection_results(best.onnx) | 11.678 | 0.37 (KB/s) |
 
-- 기대 대비 성능 악화
-    - 모든 케이스에서 카메라와 탐지 Hz 감소
-- 원인 추정
-    1. 스레드 오버헤드 의심(Lock, Event, Thread 생성, 관리 비용 추가)
-    2. 카메라 노드 병목
-- OTP03 내용 롤백 결정 : 
-    1. python 코드로는 데이터 용량이 큰 이미지 처리 과정에서 `MultiThreadedExecutor` 사용 효과가 미미함.
-    2. 분산은 안정되었으나, 성능 저하로 인해 접근방법 다시.
-
-### OTP04. 메시지 타입 변경 - 압축 토픽(CompressedImage)
+### OPT04. 메시지 타입 변경 - 압축 토픽(CompressedImage) 및 detection node 개선
 
 #### 변경사항
 
 - 메시지 타입 변경 - `Image` -> `CompressedImage`
-- QoS 설정 변경 - `custom_qos`(BEST_EFFORT / VOLATILE / KEEP_LAST / depth 1) vs `qos_profile_sensor_data` 비교
-
-#### 개선효과
-
-| Topic | Hz(avg) | BW |
-|---|---|---|
-| /camera/image_raw(best.pt) | 10.529 | 8.31 (MB/s) |
-| /detection_results(best.pt) | 8.384 | 1.50 (KB/s) |
-| /camera/image_raw(best.onnx) | 18.810 | 0.92 (MB/s) |
-| /detection_results(best.onnx) | 19.500 | 6.05 (KB/s) |
-
-### OPT04. detection node 개선3 - 스레드 안전성 및 최적화
-
-`detector_node.py` - 레이스 컨디션 수정 + 메모리 관리 + 7개 항목 최적화
-
-#### 변경 사항
+- log 형태 변경 - 객체 탐지 결과 포함하는 형태로
+- `detector_node.py` - 레이스 컨디션 수정 + 메모리 관리 + 7개 항목 최적화
 
 | 항목 | Before | After |
 |------|--------|-------|
@@ -259,7 +249,7 @@ best_int8.onnx (ONNX INT8)
 | 시간 API | `time.time()` (시스템 시간 의존) | `self.get_clock().now()` (ROS2 clock, 시간 변경 안정적으로) |
 | 메시지 변환 | 반복문 내 `append` | `_det_to_detection()` 헬퍼 메서드 분리 + 리스트 컴프리헨션 사용 |
 | imgsz 설정 | 하드코딩 `640` | `declare_parameter('imgsz', 640)` |
-
+| 메시지 타입 | `Image` | `CompressedImage` |
 
 #### 아키텍처
 
@@ -274,7 +264,7 @@ best_int8.onnx (ONNX INT8)
 - **스레드 안전성**: `_busy` 플래그 + `threading.Lock` + `queue.Queue`로 경쟁 조건 방지
 - **메모리 안전성**: `.copy()`로 C-contiguous + WRITEABLE 배열 보장
 
-#### 개선 효과
+#### 개선효과
 
 1. **레이스 컨디션 방지**: 프레임 초기화 → busy 해제 순서로 새 프레임 유실 방지
 2. **메모리 안전성**: `np.frombuffer().copy()`로 읽기 전용 뷰 문제 해결
@@ -285,13 +275,35 @@ best_int8.onnx (ONNX INT8)
 
 | Topic | Hz(avg) | BW |
 |---|---|---|
-| /camera/image_raw(best.pt) | 10.529 | 8.31 (MB/s) |
-| /detection_results(best.pt) | 8.384 | 1.50 (KB/s) |
-| /camera/image_raw(best.onnx) | 18.810 | 0.92 (MB/s) |
-| /detection_results(best.onnx) | 19.500 | 6.05 (KB/s) |
+| /camera/image_raw(best.pt) | 30.010 | 799.39 (KB/s) |
+| /detection_results(best.pt) | 20.051 | 8.40 (KB/s) |
+| /camera/image_raw(best.onnx) | 30.000 | 767.59 (KB/s) |
+| /detection_results(best.onnx) | 17.832 | 2.51 (KB/s) |
+
+#### 분석
+
+1. **카메라 Hz 30 도달** (가장 큰 개선)
+   - `best.onnx`: 7.13 → 30.000 Hz (4.2배)
+   - `best.pt`: 8.63 → 30.010 Hz (3.5배)
+   - 압축 메시지(CompressedImage) 전환으로 네트워크 대역폭 부담 감소 → 카메라 노드 타이머 콜백 정상 동작
+
+2. **대역폭 87% 감소**
+   - `best.onnx`: 5.87 MB/s → 767.59 KB/s
+   - JPEG 압축으로 인한 데이터 크기 감소가 주 요인
+
+3. **탐지 Hz 감소 (trade-off)**
+   - `best.onnx`: 30.01 → 17.832 Hz
+   - `best.pt`: 30.00 → 20.051 Hz
+   - JPEG 디코딩(`cv2.imdecode`) 오버헤드가 탐지 노드에 추가되어 처리량 감소
+   - 카메라 Hz가 30으로 증가하면서 탐지 노드에 더 많은 프레임이 도착 → 프레임 스킵 증가
+
+4. **결론**
+   - BW 절감과 카메라 Hz 안정화 목표 달성
+   - 탐지 Hz 감소는 JPEG 디코딩 오버헤드로 인한 것이며, 향후 디코딩 최적화나 하드웨어 가속 적용 시 개선 가능
 
 ### Final Benchmark
 
-| 구분 | Before | After |
-|---|---|---|
-|||
+| Topic | Before | After |
+|------|--------|-------|
+| /camera/image_raw(best.onnx) | 7.13 Hz, 5.87 MB/s | 30.000 Hz, 767.59 KB/s |
+| /detection_results(best.onnx) | 30.01 Hz, 1.08 KB/s | 17.832 Hz, 2.51 KB/s |
