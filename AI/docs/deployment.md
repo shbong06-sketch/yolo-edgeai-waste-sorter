@@ -223,6 +223,25 @@ best_int8.onnx (ONNX INT8)
 - 원인 추정
     1. 스레드 오버헤드 의심(Lock, Event, Thread 생성, 관리 비용 추가)
     2. 카메라 노드 병목
+- OTP03 내용 롤백 결정 : 
+    1. python 코드로는 데이터 용량이 큰 이미지 처리 과정에서 `MultiThreadedExecutor` 사용 효과가 미미함.
+    2. 분산은 안정되었으나, 성능 저하로 인해 접근방법 다시.
+
+### OTP04. 메시지 타입 변경 - 압축 토픽(CompressedImage)
+
+#### 변경사항
+
+- 메시지 타입 변경 - `Image` -> `CompressedImage`
+- QoS 설정 변경 - `custom_qos`(BEST_EFFORT / VOLATILE / KEEP_LAST / depth 1) vs `qos_profile_sensor_data` 비교
+
+#### 개선효과
+
+| Topic | Hz(avg) | BW |
+|---|---|---|
+| /camera/image_raw(best.pt) | 10.529 | 8.31 (MB/s) |
+| /detection_results(best.pt) | 8.384 | 1.50 (KB/s) |
+| /camera/image_raw(best.onnx) | 18.810 | 0.92 (MB/s) |
+| /detection_results(best.onnx) | 19.500 | 6.05 (KB/s) |
 
 ### OPT04. detection node 개선3 - 스레드 안전성 및 최적화
 

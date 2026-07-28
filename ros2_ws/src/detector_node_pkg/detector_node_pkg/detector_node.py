@@ -14,14 +14,14 @@ from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage
 from vision_msgs.msg import (
     Detection2D,
     Detection2DArray,
     ObjectHypothesisWithPose,
 )
 
-from .inference_engine import EngineFactory
+from inference_engine import EngineFactory
 
 
 class DetectorNode(Node):
@@ -90,7 +90,7 @@ class DetectorNode(Node):
         # → image_callback이 빠르게 종료되어 executor가 다른 콜백을 처리할 수 있음
         self._sub_group = MutuallyExclusiveCallbackGroup()
         self.subscription = self.create_subscription(
-            Image,
+            CompressedImage,
             'camera/image_raw',
             self.image_callback,
             qos_profile_sensor_data,
@@ -175,11 +175,10 @@ class DetectorNode(Node):
             except queue.Empty:
                 continue
 
-            # 프레임 복사 (독립 배열 확보: C-contiguous + WRITEABLE)
-            frame = frame.copy()
-
             with self._frame_lock:
                 self._busy = True
+                # 프레임 복사 (독립 배열 확보: C-contiguous + WRITEABLE)
+                frame = frame.copy()
 
             try:
                 # 추론 실행
@@ -237,38 +236,17 @@ class DetectorNode(Node):
         ROS2 Image 메시지를 OpenCV 이미지로 변환.
 
         Args:
-            msg: sensor_msgs/msg/Image
+            msg: sensor_msgs/msg/CompressedImage
 
         Returns
         -------
         numpy 배열 (OpenCV 이미지)
 
         """
-        # 이미지 포맷에 따라 처리
-        if msg.encoding == 'bgr8':
-            # OpenCV 기본 포맷
-            dtype = np.uint8
-            channels = 3
-        elif msg.encoding == 'rgb8':
-            # RGB 포맷 (채널 순서 변경 필요)
-            dtype = np.uint8
-            channels = 3
-        elif msg.encoding == 'mono8':
-            # 그레이스케일
-            dtype = np.uint8
-            channels = 1
-        else:
-            self.get_logger().warn(f'지원하지 않는 인코딩: {msg.encoding}')
-            return None
-
-        # numpy 배열로 변환 (copy로 C-contiguous + WRITEABLE 보장)
-        img = np.frombuffer(msg.data, dtype=dtype).copy()
-        img = img.reshape((msg.height, msg.width, channels))
-
-        # RGB인 경우 BGR로 변환 (OpenCV는 BGR 사용)
-        if msg.encoding == 'rgb8':
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-
+        np_arr = np.frombuffer(msg.data, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        if img is None:     
+            self.get_logger().debug(f'변환 실패: {msg.format}')
         return img
 
     def _det_to_detection(self, det: dict) -> Detection2D:

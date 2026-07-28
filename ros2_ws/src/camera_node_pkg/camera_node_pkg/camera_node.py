@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage
 import cv2
 from rclpy.qos import qos_profile_sensor_data
 
@@ -51,7 +51,7 @@ class CameraNode(Node):
         
         # 발행자 생성
         # QoS : qos_profile_sensor_data
-        self.publisher_ = self.create_publisher(Image, 'camera/image_raw', qos_profile_sensor_data)
+        self.publisher_ = self.create_publisher(CompressedImage, 'camera/image_raw', qos_profile_sensor_data)
         
         # 타이머 생성 (프레임 전송 간격)
         # 1/fps초마다 publish_image 콜백 함수 실행
@@ -71,18 +71,20 @@ class CameraNode(Node):
         if not ret:
             self.get_logger().warn('프레임을 읽을 수 없습니다.')
             return
+
+        # JPEG 압축 시도
+        success, encoded = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        if not success:
+            self.get_logger().debug('JPEG 인코딩 실패, 다음 프레임으로 건너뜀')
+            return
         
-        # OpenCV BGR 이미지를 ROS2 Image 메시지로 변환
-        image_msg = Image()
+        # CompressedImage 메시지 생성
+        image_msg = CompressedImage()
         image_msg.header.stamp = self.get_clock().now().to_msg()
         image_msg.header.frame_id = 'camera_frame'
-        image_msg.height = frame.shape[0]  # 프레임 높이
-        image_msg.width = frame.shape[1]   # 프레임 너비
-        image_msg.encoding = 'bgr8'        # OpenCV는 기본적으로 BGR 포맷
-        image_msg.is_bigendian = False
-        image_msg.step = frame.shape[1] * 3  # 너비 * 3채널(RGB)
-        image_msg.data = frame.tobytes()     #numpy 배열을 바이트로 변환
-        
+        image_msg.format = 'jpeg'
+        image_msg.data = encoded.tobytes()
+
         # 토픽 발행
         self.publisher_.publish(image_msg)
 
