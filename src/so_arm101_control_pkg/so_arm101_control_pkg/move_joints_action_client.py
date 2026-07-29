@@ -1,44 +1,75 @@
 #!/usr/bin/env python3
 
-from builtin_interfaces.msg import Duration
 import rclpy
 from rclpy.action import ActionClient
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-
-
 from sensor_msgs.msg import JointState
-from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesis     # YOLO 객체탐지 결과 데이터 클래스
-
 from so_arm101_interface_pkg.action import MoveJoints
+from vision_msgs.msg import Detection2DArray
 
 
-
+# detector 및 Isaac Sim과 연결할 ROS 인터페이스 이름
 ACTION_NAME = 'move_joints_action'
+DETECTION_TOPIC = '/topcam/position_maker'
 JOINT_STATE_TOPIC = '/so_arm101/joint_states'
 
-# Isaac Sim이 보내는 관절 순서에 대응하는 네 개의 목표 위치(rad)
-WAYPOINTS = [
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    [0.35, -0.30, 0.45, -0.20, 0.25, 0.15],
-    [-0.35, -0.15, 0.30, 0.25, -0.25, 0.45],
-    [0.0, -0.40, 0.60, -0.20, 0.0, 0.0],
-]
+# 설계에서 정한 객체 처리 최소 신뢰도
+CONFIDENCE_THRESHOLD = 0.85
+
+# TopViewCam 영상과 실제 shopTable 크기
+IMAGE_WIDTH = 640
+IMAGE_HEIGHT = 480
+TABLE_X_SIZE = 0.8085078
+TABLE_Y_SIZE = 1.1356210
+
+# 화면 세로 방향은 World X, 화면 가로 방향은 World Y에 대응한다.
+METERS_PER_PIXEL_X = TABLE_X_SIZE / IMAGE_HEIGHT
+METERS_PER_PIXEL_Y = TABLE_Y_SIZE / IMAGE_WIDTH
+
+
+def pixel_to_robot_offset(pixel_x, pixel_y):
+    """영상 중심에서 객체까지의 픽셀 거리를 로봇 XY 이동량으로 바꾼다."""
+    image_center_x = IMAGE_WIDTH / 2.0
+    image_center_y = IMAGE_HEIGHT / 2.0
+
+    # World +X는 화면 위쪽, World +Y는 화면 왼쪽 방향이다.
+    robot_x = (image_center_y - pixel_y) * METERS_PER_PIXEL_X
+    robot_y = (image_center_x - pixel_x) * METERS_PER_PIXEL_Y
+    return robot_x, robot_y
+
+
+def is_valid_detection(detection):
+    """객체 검출 정보가 현재 처리 조건을 만족하는지 확인한다."""
+    # 분류 결과가 없으면 class와 confidence를 확인할 수 없다.
+    if not detection.results:
+        return False
+
+    # 첫 번째 분류 결과를 대표 결과로 사용한다.
+    if detection.results[0].hypothesis.score < CONFIDENCE_THRESHOLD:
+        return False
+
+    # 크기가 없는 bbox는 좌표 매핑과 허용 반경 계산에 사용할 수 없다.
+    if detection.bbox.size_x <= 0.0 or detection.bbox.size_y <= 0.0:
+        return False
+
+    return True
 
 
 class MoveJointsActionClient(Node):
-    """Isaac Sim의 관절 정보를 사용해 네 개의 목표점을 이동한다."""
+    """객체 정보를 받아 좌표 변환과 이동을 준비하는 액션 클라이언트."""
 
     def __init__(self):
         super().__init__('move_joints_action_client')
 
-        # 로봇 제어용 액션 클라이언트
+        # 다음 단계에서 변환된 관절 목표값을 전송할 액션 클라이언트
         self.action_client = ActionClient(
             self,
             MoveJoints,
             ACTION_NAME,
         )
 
-        # 로봇 상태체크 토픽 (현재는 축 위치만 받고있음.)
+        # Isaac Sim의 실제 관절 이름과 순서를 가져온다.
         self.joint_state_subscription = self.create_subscription(
             JointState,
             JOINT_STATE_TOPIC,
@@ -46,116 +77,75 @@ class MoveJointsActionClient(Node):
             10,
         )
 
-
-        self.joint_names = []               # 축 이름 (로봇에게 받음)
-        self.waypoint_index = 0
-
-
-        # 객체좌표 수신용 토픽 서브스크라이버
-        self.detection_subscriber = self.create_subscription(
-            Detection2DArray, "topcam/position_maker",
-            self.received_positions,
-            10
+        # detector가 발행한 객체 검출 목록을 받는다.
+        self.detection_subscription = self.create_subscription(
+            Detection2DArray,
+            DETECTION_TOPIC,
+            self.detection_callback,
+            10,
         )
 
-    def received_positions(self, msg):
-        objects = msg
+        self.joint_names = []
 
-        self.get_logger().info(f"received {len(objects.detections)} object(s)")
+        # 현재 수신 주기에서 검증을 통과한 객체를 입력 순서대로 보관한다.
+        # 다음 단계에서 이 목록을 좌표 변환 및 IK 입력으로 사용할 예정이다.
+        self.pending_detections = []
 
-        for obj in objects.detections:
-            infoClass = obj.results[0].hypothesis
-            bbox = obj.bbox
-
-            self.get_logger().info(f"[{infoClass.class_id:<10}] - {bbox.center}")
-
-
-    def start(self):
-        """액션 서버와 Isaac Sim 관절 정보를 기다린다."""
-        self.get_logger().info('Waiting for MoveJoints action server...')
-        self.action_client.wait_for_server()
         self.get_logger().info(
-            f'Waiting for joint names on {JOINT_STATE_TOPIC}...'
+            f'Waiting for detections on {DETECTION_TOPIC}.'
         )
 
-    def joint_state_callback(self, msg):
-        """Isaac Sim에서 관절 이름과 순서를 한 번 가져온다."""
-        if self.joint_names or not msg.name:
-            return
-
-        if len(msg.name) != len(WAYPOINTS[0]):
-            self.get_logger().error(
-                f'Isaac Sim has {len(msg.name)} joints, but each waypoint '
-                f'contains {len(WAYPOINTS[0])} positions.'
+    def joint_state_callback(self, message):
+        """Isaac Sim의 관절 이름과 순서를 저장한다."""
+        if not self.joint_names and message.name:
+            self.joint_names = list(message.name)
+            self.get_logger().info(
+                f'Received Isaac Sim joints: {self.joint_names}'
             )
-            rclpy.shutdown()
-            return
 
-        self.joint_names = list(msg.name)
+    def detection_callback(self, message):
+        """유효한 객체를 입력 순서대로 저장한다."""
         self.get_logger().info(
-            f'Using Isaac Sim joints: {self.joint_names}'
-        )
-        self.send_next_goal()
-
-    def send_next_goal(self):
-        """다음 목표점을 액션 서버로 전송한다."""
-        if self.waypoint_index >= len(WAYPOINTS):
-            self.get_logger().info('All four waypoints completed.')
-            rclpy.shutdown()
-            return
-
-        target_state = JointState()
-        target_state.name = self.joint_names
-        target_state.position = WAYPOINTS[self.waypoint_index]
-
-        goal = MoveJoints.Goal()
-        goal.target_state = target_state
-        goal.duration = Duration(sec=3)
-
-        point_number = self.waypoint_index + 1
-        self.get_logger().info(
-            f'Sending waypoint {point_number}/{len(WAYPOINTS)}: '
-            f'{target_state.position}'
+            f'Received {len(message.detections)} detection(s).'
         )
 
-        future = self.action_client.send_goal_async(
-            goal,
-            feedback_callback=self.feedback_callback,
-        )
-        future.add_done_callback(self.goal_response_callback)
+        # 새 Detection2DArray가 오면 이전 주기 목록을 교체한다.
+        # 리스트 컴프리헨션을 사용하므로 원본 메시지의 객체 순서가 유지된다.
+        self.pending_detections = [
+            detection
+            for detection in message.detections
+            if is_valid_detection(detection)
+        ]
 
-    def goal_response_callback(self, future):
-        """Goal 수락 여부를 확인한다."""
-        goal_handle = future.result()
-
-        if not goal_handle.accepted:
-            self.get_logger().error(
-                f'Waypoint {self.waypoint_index + 1} was rejected.'
+        for index, detection in enumerate(self.pending_detections, start=1):
+            hypothesis = detection.results[0].hypothesis
+            center = detection.bbox.center.position
+            robot_x, robot_y = pixel_to_robot_offset(
+                center.x,
+                center.y,
             )
-            rclpy.shutdown()
-            return
+            self.get_logger().info(
+                f'Accepted #{index}: class={hypothesis.class_id}, '
+                f'score={hypothesis.score:.3f}, '
+                f'center=({center.x:.1f}, {center.y:.1f}), '
+                f'bbox=({detection.bbox.size_x:.1f}, '
+                f'{detection.bbox.size_y:.1f}), '
+                f'robot_offset=({robot_x:.4f}, {robot_y:.4f})m'
+            )
 
-        result_future = goal_handle.get_result_async()
-        result_future.add_done_callback(self.result_callback)
-
-    def feedback_callback(self, feedback_msg):
-        """현재 목표점의 진행률을 출력한다."""
-        progress = feedback_msg.feedback.progress * 100.0
-        self.get_logger().info(
-            f'Waypoint {self.waypoint_index + 1}: {progress:.1f}%'
+        # 입력 개수와 통과 개수의 차이로 제외된 객체 수를 기록한다.
+        rejected_count = (
+            len(message.detections) - len(self.pending_detections)
         )
+        if rejected_count:
+            self.get_logger().warning(
+                f'Rejected {rejected_count} invalid detection(s).'
+            )
 
-    def result_callback(self, future):
-        """성공하면 다음 목표점으로 이동한다."""
-        result = future.result().result
-
-        if not result.success:
-            self.get_logger().error(result.message)
-            rclpy.shutdown()
-            return
-
-        self.waypoint_index += 1
-        self.send_next_goal()
+        if not self.pending_detections:
+            self.get_logger().warning(
+                'No valid detections to process in this cycle.'
+            )
 
 
 def main(args=None):
@@ -163,10 +153,8 @@ def main(args=None):
     node = MoveJointsActionClient()
 
     try:
-
-        #node.start()
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()

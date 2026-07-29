@@ -25,11 +25,10 @@ setup(
     entry_points={
         'console_scripts': [
             'move_joints_action_client = '
-                'so_arm101_control_pkg.move_joints_action_client:main',
+            'so_arm101_control_pkg.move_joints_action_client:main',
             'move_joints_action_server = '
-                'so_arm101_control_pkg.move_joints_action_server:main',
-
-            "make_position_yolo = so_arm101_control_pkg.detector:main",
+            'so_arm101_control_pkg.move_joints_action_server:main',
+            'mock_detector = so_arm101_control_pkg.detector:main',
         ],
     },
 )
