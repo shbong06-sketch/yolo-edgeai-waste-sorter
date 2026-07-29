@@ -41,8 +41,10 @@ class MockDetector(Node):
         # 지정한 주기마다 새로운 객체 목록을 생성한다.
         self.publish_timer = self.create_timer(
             self.publish_interval,
-            self.publish_detections,
+            # self.publish_detections,
+            self.pub_once
         )
+
         self.add_on_set_parameters_callback(self.parameters_callback)
 
         self.get_logger().info(
@@ -125,6 +127,34 @@ class MockDetector(Node):
 
         self.detection_publisher.publish(message)
 
+
+    # 테스트용 객체 1개 좌표 데이터 생성 후 발행
+    def pub_once(self):
+
+        self.get_logger().info(
+                    f'Publishing mock detections on {DETECTION_TOPIC} once '
+                    f'{self.publish_interval:.1f}s.'
+                )
+        
+        cntObject = 1
+
+        message = Detection2DArray()
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.header.frame_id = 'isaac_sim_topcam'
+        
+        detection = self.generate_detection(cntObject)
+        detection.header = message.header
+        message.detections.append(detection)
+
+        hypothesis = detection.results[0].hypothesis
+        center = detection.bbox.center.position
+        self.get_logger().info(
+            f'Generated #{cntObject + 1}: class={hypothesis.class_id}, '
+            f'score={hypothesis.score:.3f}, '
+            f'center=({center.x:.1f}, {center.y:.1f})'
+        )
+
+        self.detection_publisher.publish(message)
 
 def main(args=None):
     rclpy.init(args=args)
