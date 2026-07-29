@@ -4,8 +4,13 @@ from builtin_interfaces.msg import Duration
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
+
+
 from sensor_msgs.msg import JointState
+from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesis     # YOLO 객체탐지 결과 데이터 클래스
+
 from so_arm101_interface_pkg.action import MoveJoints
+
 
 
 ACTION_NAME = 'move_joints_action'
@@ -26,11 +31,14 @@ class MoveJointsActionClient(Node):
     def __init__(self):
         super().__init__('move_joints_action_client')
 
+        # 로봇 제어용 액션 클라이언트
         self.action_client = ActionClient(
             self,
             MoveJoints,
             ACTION_NAME,
         )
+
+        # 로봇 상태체크 토픽 (현재는 축 위치만 받고있음.)
         self.joint_state_subscription = self.create_subscription(
             JointState,
             JOINT_STATE_TOPIC,
@@ -38,8 +46,29 @@ class MoveJointsActionClient(Node):
             10,
         )
 
-        self.joint_names = []
+
+        self.joint_names = []               # 축 이름 (로봇에게 받음)
         self.waypoint_index = 0
+
+
+        # 객체좌표 수신용 토픽 서브스크라이버
+        self.detection_subscriber = self.create_subscription(
+            Detection2DArray, "topcam/position_maker",
+            self.received_positions,
+            10
+        )
+
+    def received_positions(self, msg):
+        objects = msg
+
+        self.get_logger().info(f"received {len(objects.detections)} object(s)")
+
+        for obj in objects.detections:
+            infoClass = obj.results[0].hypothesis
+            bbox = obj.bbox
+
+            self.get_logger().info(f"[{infoClass.class_id:<10}] - {bbox.center}")
+
 
     def start(self):
         """액션 서버와 Isaac Sim 관절 정보를 기다린다."""
@@ -134,7 +163,8 @@ def main(args=None):
     node = MoveJointsActionClient()
 
     try:
-        node.start()
+
+        #node.start()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass

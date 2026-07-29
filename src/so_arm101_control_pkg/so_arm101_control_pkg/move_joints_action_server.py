@@ -148,6 +148,9 @@ class MoveJointsActionServer(Node):
         self.current_joint_state = msg
         self.get_logger().info(f"Received {len(msg.name)} joints")
 
+
+
+
 def main(args=None):
     rclpy.init(args=args)
 
