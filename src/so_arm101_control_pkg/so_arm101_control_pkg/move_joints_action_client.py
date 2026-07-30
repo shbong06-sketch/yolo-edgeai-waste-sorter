@@ -80,6 +80,10 @@ class MoveJointsActionClient(Node):
         self.current_positions = {}
         self.moving = False
 
+
+
+        
+
     def joint_state_callback(self, message):
         """Isaac Sim의 현재 관절값을 이름별로 저장한다."""
         self.current_positions.update(
@@ -153,17 +157,7 @@ class MoveJointsActionClient(Node):
 
         goal = MoveJoints.Goal()
         goal.target_state = target_state
-
-        # 테스트용 (고정)
-        goal.target_state.position = [
-            0.3213385598622175, 
-            0.24957052503822277, 
-            -0.22392581447587798, 
-            -0.11070394531338472,
-            -0.5000160834530123, 
-            0.1]
-        
-        goal.duration = Duration(sec=3)
+        goal.duration = Duration(sec=10)
 
         self.moving = True
         self.get_logger().info(
