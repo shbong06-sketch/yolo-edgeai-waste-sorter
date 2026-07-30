@@ -17,6 +17,7 @@ from vision_msgs.msg import (
 IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 480
 IMAGE_MARGIN = 100
+
 DETECTION_TOPIC = '/topcam/position_maker'
 CLASS_NAMES = ['CAN', 'PET', 'STYROFOAM']
 
@@ -111,6 +112,7 @@ class MockDetector(Node):
 
         # 한 번 발행할 때 1~3개의 객체가 탐지된 상황을 가정한다.
         object_count = random.randint(1, 3)
+
         for index in range(object_count):
             detection = self.generate_detection(index)
             detection.header = message.header
