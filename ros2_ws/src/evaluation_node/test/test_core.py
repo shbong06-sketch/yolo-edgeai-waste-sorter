@@ -1,5 +1,7 @@
 import csv
 
+import pytest
+
 from evaluation_node.core import EvaluationRun
 
 
@@ -98,3 +100,17 @@ def test_abort_records_failure_and_continues(tmp_path):
     success, row = run.abort_trial()
     assert success and 'operator_aborted' in row['failure_reasons']
     assert run.status == 'running'
+
+
+def test_validate_config_rejects_non_numeric_threshold():
+    data = config()
+    data['position_tolerance_mm'] = 'not-a-number'
+    with pytest.raises(ValueError, match='position_tolerance_mm must be numeric'):
+        EvaluationRun.validate_config(data)
+
+
+def test_validate_config_rejects_warning_above_tolerance():
+    data = config()
+    data['position_warning_mm'] = 10
+    with pytest.raises(ValueError, match='position_warning_mm must not exceed position_tolerance_mm'):
+        EvaluationRun.validate_config(data)

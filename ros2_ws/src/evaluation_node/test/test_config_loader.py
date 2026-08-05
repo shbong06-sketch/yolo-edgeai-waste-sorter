@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from evaluation_node.config_loader import load_config, resolve_config_path
 
 
@@ -16,3 +18,10 @@ def test_environment_config_is_used_without_parameter(tmp_path, monkeypatch):
     config.write_text('start_key: s\n', encoding='utf-8')
     monkeypatch.setenv('EVALUATION_CONFIG', str(config))
     assert resolve_config_path() == Path(config)
+
+
+def test_empty_config_file_is_rejected(tmp_path):
+    config = tmp_path / 'evaluation.yaml'
+    config.write_text('', encoding='utf-8')
+    with pytest.raises(ValueError, match='mapping/object'):
+        load_config(config)

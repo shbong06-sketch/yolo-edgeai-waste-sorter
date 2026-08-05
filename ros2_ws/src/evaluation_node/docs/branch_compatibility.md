@@ -1,37 +1,36 @@
-# Branch compatibility (wsSIM excluded)
+# 브랜치 호환성 정리(wsSIM 제외)
 
-Reviewed remote: `https://github.com/shbong06-sketch/yolo-edgeai-waste-sorter.git`.
+검토한 원격 저장소: `https://github.com/shbong06-sketch/yolo-edgeai-waste-sorter.git`.
 
-| Branch | Camera/detection | Robot interface | Evaluation decision |
+| 브랜치 | 카메라/탐지 인터페이스 | 로봇 인터페이스 | 평가 노드 판단 |
 |---|---|---|---|
-| `main` (`b253550`) | No ROS workspace implementation. | None. | Not usable as an interface source. |
-| `development` (`7af0a5b`) | `detector_node` publishes relative `detection_results`; `vision_msgs/msg/Detection2DArray`; pixel centre is `bbox.center.position.x/y`. ONNX engine may emit numeric IDs as strings. | Skeleton package only. | Detector message layout reference only. |
-| `feature/so101-robot-control` (`3c5c511`) | Same topic/message; Ultralytics model names include `can`, `pet bottle`, `styrofoam`. | `/follower/joint_states` (`sensor_msgs/JointState`), joints `shoulder_pan`, `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, `gripper`; action `/follower/joint_trajectory_controller/follow_joint_trajectory`. | Primary physical-robot interface. Evaluation subscribes to Action status and feedback only and creates no action client. |
+| `main` (`b253550`) | ROS 워크스페이스 구현이 없음. | 없음. | 인터페이스 기준으로 사용할 수 없음. |
+| `development` (`7af0a5b`) | `detector_node`가 상대 토픽 `detection_results`를 발행함. 메시지는 `vision_msgs/msg/Detection2DArray`이고 픽셀 중심은 `bbox.center.position.x/y`임. ONNX 엔진은 숫자 ID를 문자열로 발행할 수 있음. | 뼈대 패키지만 있음. | detector 메시지 레이아웃 참고용. |
+| `feature/so101-robot-control` (`3c5c511`) | 동일한 토픽/메시지를 사용함. Ultralytics 모델 클래스 이름은 `can`, `pet bottle`, `styrofoam`임. | `/follower/joint_states`(`sensor_msgs/JointState`)를 사용하고 관절 이름은 `shoulder_pan`, `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, `gripper`임. 액션은 `/follower/joint_trajectory_controller/follow_joint_trajectory`임. | 실제 로봇 기준 인터페이스로 사용함. 평가 노드는 액션 상태와 피드백만 구독하고 액션 클라이언트는 만들지 않음. |
 
-## Calibration and coordinates
+## 캘리브레이션과 좌표
 
-The physical control branch calculates a 3x3 homography from camera pixels to
-robot XY for motion planning. The evaluation node does not use detector pixels
-to estimate position: it compares FK from measured joints directly with the
-configured ground-truth robot XY. Therefore it neither loads nor requires a
-homography file. This keeps the evaluation package independent of a calibration
-artefact that does not participate in its metrics.
+실제 로봇 제어 브랜치는 카메라 픽셀을 로봇 XY로 변환하기 위해 3x3
+호모그래피를 계산한다. 평가 노드는 detector 픽셀로 위치를 추정하지 않고,
+측정된 관절값으로 계산한 FK를 설정 파일의 정답 로봇 XY와 직접 비교한다.
+따라서 평가 노드는 호모그래피 파일을 읽거나 요구하지 않는다. 이렇게 하면
+평가 지표에 직접 참여하지 않는 캘리브레이션 산출물과 평가 패키지를 분리할
+수 있다.
 
-The control branch uses link lengths `(L1,L2,L3)=(80,117,223)` mm, offsets
+제어 브랜치는 링크 길이 `(L1,L2,L3)=(80,117,223)` mm, 오프셋
 `pan=3.1738062501353914`, `lift=1.3330293046726223`,
-`elbow=4.535981189777841`, `wrist_flex=4.512971477959557`, mathematical home
-angles `lift=-0.1745`, `elbow=-3.0543`, and lift scale `2.0`. Its commanded
-gripper values are open `3.80` and closed `2.70`. Evaluation reverses that IK
-mapping for FK, but configuration confirmation is still required before a run.
+`elbow=4.535981189777841`, `wrist_flex=4.512971477959557`, 수학적 홈 각도
+`lift=-0.1745`, `elbow=-3.0543`, lift 배율 `2.0`을 사용한다. gripper 명령값은
+열림 `3.80`, 닫힘 `2.70`이다. 평가는 이 IK 매핑을 역으로 사용해 FK를
+계산하지만, 실행 전 실제 장비에서 설정 확인은 반드시 필요하다.
 
-## Required operator-supplied values
+## 작업자가 제공해야 하는 값
 
-Provide approved GT XY positions, tolerance/warning thresholds, and
-confirmation that the physical joint offsets and gripper thresholds still
-match the robot. Then set
-`configuration_confirmed` and, for a final run, `thresholds_locked` to true.
+승인된 GT XY 위치, 허용/경고 오차 기준, 실제 관절 오프셋과 gripper 임계값이
+현재 로봇과 맞는지 확인한 값을 제공한다. 그 다음 `configuration_confirmed`를
+true로 바꾸고, 최종 평가라면 `thresholds_locked`도 true로 바꾼다.
 
-## Runtime layout
+## 실행 구조
 
 두 프로세스를 별도로 실행한다. `evaluation_node`는 토픽을 관찰하고 평가
 서비스와 결과 파일을 관리한다. `keyboard_node`만 터미널을 cbreak 모드로
