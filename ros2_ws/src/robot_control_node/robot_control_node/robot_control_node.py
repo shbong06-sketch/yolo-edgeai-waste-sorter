@@ -8,6 +8,9 @@ from action_msgs.msg import GoalStatus
 import numpy as np
 import threading
 import time
+import csv
+from datetime import datetime
+
 
 from vision_msgs.msg import Detection2DArray
 from control_msgs.action import FollowJointTrajectory
@@ -34,6 +37,14 @@ class RobotControlNode(Node):
         except FileNotFoundError:
             self.get_logger().error(f'행렬 파일을 찾을 수 없습니다: {npy_path}')
             raise SystemExit
+
+        # 4. CSV
+        self.csv_path = "grasp_metrics_log.csv"
+        self.trial_id = 0
+        self.current_object_class = "unknown"  # AttributeError 방지용 초기화
+
+        # CSV 파일 및 헤더 생성
+        self._init_csv_file()
 
         
         
@@ -76,9 +87,9 @@ class RobotControlNode(Node):
         self.scale_lift = 2.0
         
         # 고정 상수
-        self.wrist_roll_val = 2.9805246708618007  
-        self.gripper_open   = 3.80        
-        
+        self.wrist_roll_val = 2.9805246708618007  # 손목 회전 모터의 고정값 (라디안)
+
+        self.gripper_open   = 4.00       
         self.gripper_close  = 2.70
 
         self.real_angles_6 = None  
@@ -91,6 +102,7 @@ class RobotControlNode(Node):
             self.detection_callback,
             10,
             callback_group=self.main_cb_group
+            
         )
         
         # 실물 관절 상태 피드백 구독
@@ -104,6 +116,22 @@ class RobotControlNode(Node):
         
         self.get_logger().info('=== 독자 스레드 격리형 무블로킹 액션 제어 노드 가동 ===')
 
+
+    def _init_csv_file(self):
+        """파일이 새로 생성될 때 전체 5개 열 헤더를 작성합니다."""
+        with open(self.csv_path, mode="a", newline="", encoding="utf-8") as f:
+            if f.tell() == 0:  # 파일의 크기가 0(새 파일)일 때만 헤더 기록
+                writer = csv.writer(f)
+                writer.writerow(["trial_id", "class_name", "real_angle_rad", "is_grasped"])
+
+    def _write_csv_row(self, row_data):
+        """데이터 1행을 상대경로 CSV 파일에 추가 기록합니다."""
+        with open(self.csv_path, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(row_data)
+
+
+
     def _connect_to_action_server(self):
         while rclpy.ok():
             if self._action_client.wait_for_server(timeout_sec=1.0):
@@ -113,6 +141,12 @@ class RobotControlNode(Node):
             time.sleep(0.1)
 
     def joint_state_callback(self, msg):
+        # 임시 그리퍼 값 확인용
+        if self.real_angles_6 is not None:
+            self.get_logger().info(
+                f"현재 그리퍼 인코더 값: {self.real_angles_6[5]:.4f}",
+                throttle_duration_sec=2.0)
+
         try:
             mapped_angles = []
             for name in self.joint_names:
@@ -146,6 +180,9 @@ class RobotControlNode(Node):
                 
                 # 감지된 객체가 목표 리스트 안에 들어있는지 확인 (in 연산자)
                 if clean_class_name in target_list:
+                    if self.current_state in ["WAIT", "IDLE"]:
+                        self.class_name = clean_class_name
+                        
                     u = detection.bbox.center.position.x
                     v = detection.bbox.center.position.y
                     
@@ -156,7 +193,10 @@ class RobotControlNode(Node):
                         return 
                     
                     self.get_logger().info(f' 캔 포착 성공 -> 월드 좌표: X={robot_x:.1f}mm, Y={robot_y:.1f}mm')
-                    
+
+                    Z_SAFETY_MARGIN = 15.0  # mm 단위 
+                    robot_z = robot_z + Z_SAFETY_MARGIN
+
                     joint_angles_6 = self.calculate_6_axis_positions(robot_x, robot_y, robot_z, self.gripper_open)
                     if joint_angles_6 is not None:
                         self.saved_target_angles_6 = joint_angles_6
@@ -248,7 +288,10 @@ class RobotControlNode(Node):
             self.saved_target_angles_6[5] = self.gripper_close  
             self.send_trajectory_action_goal(self.saved_target_angles_6, travel_time_sec=1.5)
 
+       
+
         elif self.current_state == "GRASP":
+
             self.current_state = "LIFT_UP"
             self.get_logger().info(" [시퀀스 5단계] ➔ LIFT_UP 시작 (어깨 놔두고 팔꿈치만 다시 90도로 수직 복귀)")
             
@@ -269,9 +312,32 @@ class RobotControlNode(Node):
             self.send_trajectory_action_goal(home_target, travel_time_sec=4.0)
 
         elif self.current_state == "LIFT_AND_MOVE":
+
+            self.trial_id += 1
+
+            real_angle = round(self.real_angles_6[5], 3) if self.real_angles_6 is not None else 0.000
+            is_grasped = real_angle > 3.20
+
+            # 4개 열 CSV 기록
+            self._write_csv_row([self.trial_id, self.class_name, real_angle, is_grasped])
+            
+            self.get_logger().info(
+                f" [이송 후 파지 최종 검증] 회차: {self.trial_id} | 클래스: {self.class_name} | "
+                f"최종 실측 각도: {real_angle:.3f} | 최종 성공 여부: {is_grasped}"
+            )
+
             self.current_state = "RELEASE"
             self.get_logger().info("  [ACTION] ➔ RELEASE 시작 (집게 열기 및 폐기물 배출)")
             home_target = [self.offset_pan, self.offset_lift, self.offset_flex1, self.offset_flex2, self.wrist_roll_val, self.gripper_open]
+
+            release_target = [
+                self.offset_pan,
+                self.offset_lift,
+                self.offset_flex1,
+                self.offset_flex2,
+                self.wrist_roll_val,
+                self.gripper_open
+            ]
             self.send_trajectory_action_goal(home_target, travel_time_sec=2.0)
 
         elif self.current_state == "RELEASE":
