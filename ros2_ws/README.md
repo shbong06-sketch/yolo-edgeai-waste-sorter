@@ -1,234 +1,169 @@
-# YOLO Edge AI waste Sorter - ROS2
+# ♻️ YOLO 기반 에지 AI 쓰레기 자동 분류 시스템
+> **YOLO-Based Edge AI Automated Waste Sorting System with SO-ARM 101**
 
-## 패키지 구조
+본 프로젝트는 스마트 팩토리 및 자동화 공정의 재활용 분리수거 수작업 의존도 문제를 해결하기 위해 **비전 AI(YOLO)**와 **로봇 공학(ROS2)**을 결합한 자동 선별 시스템입니다. 
 
-*노드별로 독립된 패키지로 구성*
-```
-ros2_ws/
-└── src/
-    ├── camera_node_pkg/            # 패키지 1 (카메라 노드)
-    │   ├── camera_node_pkg/
-    │   │   ├── __init__.py
-    │   │   └── camera_node.py
-    │   ├── resource/camera_node_pkg
-    │   ├── test/
-    │   ├── package.xml
-    │   ├── setup.py
-    │   └── setup.cfg
-    │
-    ├── detector_node_pkg/          # 패키지 2 (객체 탐지 노드)
-    │   ├── detector_node_pkg/
-    │   │   ├── __init__.py
-    │   │   └── detector_node.py
-    │   ├── resource/detector_node_pkg
-    │   ├── test/
-    │   ├── package.xml
-    │   ├── setup.py
-    │   └── setup.cfg
-    │
-    ├── robot_control_node/         # 패키지 3 (호모그래피 및 IK 제어 노드)
-    │   ├── robot_control_node/
-    │   │   ├── __init__.py
-    │   │   └── robot_control_node.py
-    │   ├── package.xml
-    │   ├── setup.py
-    │   └── setup.cfg
-    │
-    └── so101-ros-physical-ai/      # 패키지 4 (물리 AI 로봇)
-        ├── so101_bringup/
-        ├── so101_description/
-        └── so101_teleop/
-```
+카메라 피드를 통해 실시간으로 유입되는 폐기물을 에지 디바이스 환경에서 고속으로 탐지하고, 로봇 마니퓰레이터(SO-ARM 101)와 연동하여 지정된 수거함으로 자동 분류하는 완전 자동화 공정 프로세스를 구현합니다.
 
-## 시스템 흐름
+---
 
+## 🎯 프로젝트 개요 & 목표 (Objectives)
+
+### 1. 문제 정의
+* 스마트 팩토리 및 자동화 공정에서 재활용품 분리수거는 여전히 수작업 의존도가 높고 비용이 많이 드는 영역입니다.
+* 작업자의 안전 문제와 구인난을 해결하기 위해, 비전 AI와 로봇 공학을 결합한 고속 자동 선별 시스템의 도입이 시급합니다.
+
+### 2. 핵심 목표 (MVP)
+* **데이터셋 구축:** AIHub 데이터를 활용한 **[금속 캔, 페트병, 스티로폼]** 3종 맞춤형 데이터셋 구축 (총 9,999장)
+* **AI 모델 최적화:** 실시간 추론을 위한 경량화된 YOLO 객체 탐지 모델 학습 및 성능 확보
+
+### 3. 추가 목표 (Stretch Goal)
+* **시뮬레이션 및 실물 연동:** SO-ARM 101 로봇 팔과 소형 가상(Isaac Sim 등)/실물 컨베이어 벨트 연동
+* **비전-행동(Vision-to-Action) 구현:** 카메라가 탐지한 쓰레기의 2D 픽셀 좌표를 로봇의 3D 공간 좌표계로 변환(Homography)하여 실시간 그리핑 및 지정 수거함 자동 분류 공정 구현
+
+---
+
+## ⚙️ 시스템 아키텍처 & 흐름도 (Architecture)
+
+### [ 데이터/학습 파이프라인 (Offline) ]
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│  camera_node_pkg                                                │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ /camera_node                                              │  │
-│  │ USB 카메라 → ROS Image 메시지 발행                            │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-           │
-           │ /camera/image_raw (sensor_msgs/msg/Image)
-           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  detector_node_pkg                                              │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ /detector_node                                            │  │
-│  │ YOLO 모델로 객체 탐지 → Detection2DArray 발행                  │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-           │
-           │ /detection_results (vision_msgs/msg/Detection2DArray)
-           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  robot_control_node                                             │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ /robot_control_node                                       │  │
-│  │ 픽셀좌표 → Homography 변환 → IK 연산 → 관절 각도 산출            │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-           │
-           │ /joint_trajectory_controller/joint_trajectory
-           │ (trajectory_msgs/msg/JointTrajectory)
-           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  so101-ros-physical-ai                                          │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ /so101_bringup_node                                       │  │
-│  │ ROS2 관절 명령 → Serial 신호 변환 → USB 통신                   │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-           │
-           │ USB Serial (/dev/ttyUSBX)
-           ▼
-      ┌───────────┐
-      │ SO-ARM101 │
-      └───────────┘
+AIHub 데이터 수집 ──> 데이터 전처리/라벨링 ──> YOLO 모델 학습 ──> 경량화 모델 최적화 (.pt/.onnx)
+
+[ 실시간 비전-행동 제어 루프 (Online) ]
+Plaintext
+컨베이어 벨트 구동 ──> 비전 카메라 스트리밍 ──> 이미지 프레임 입력 ──> YOLO 객체 탐지
+                                                                          │ (클래스, 2D 좌표)
+수거함 배치 완료 <── ROS2 로봇 팔 제어 <── 3D 공간 좌표 변환 (Homography) <──┘
+하드웨어 및 소프트웨어 통합 레이어
+레이어 (Layer)	구성 요소	데이터 흐름 및 역할
+1. 입력단 (Input)	컨베이어 벨트, RGB 비전 카메라	벨트 위로 이동하는 폐기물 영상을 실시간(FPS)으로 캡처하여 스트리밍 데이터로 전송
+2. 인지단 (Perception)	PC / 에지 디바이스 (YOLO Engine)	입력된 프레임에서 [금속 캔, 페트병, 스티로폼]을 탐지하고, 바운딩 박스의 중심점 픽셀 좌표 (x, y) 추출
+3. 제어단 (Control)	좌표 변환 모듈, ROS2 프레임워크	카메라 2D 픽셀 좌표 (x, y)를 로봇 작업 공간의 3D 물리 좌표 (X, Y, Z)로 변환 후, 로봇 역기하학(Inverse Kinematics) 기반 궤적 생성
+4. 구동단 (Action)	SO-ARM 101 마니퓰레이터	생성된 궤적을 따라 그리퍼를 이동하여 타겟을 집고(Gripping), 지정된 쓰레기 수거함 위치로 이동 및 분류
 ```
 
-## 의존성
+## 📂 프로젝트 구조 (Repository Structure)
 
-| 구분 | ROS2 | Python |
-|---|---|---|
-| camera_node_pkg | rclpy, sensor_msgs | opencv-python, numpy |
-| detector_node_pkg | rclpy, sensor_msgs, vision_msgs | ultralytics, opencv-python, numpy, torch |
-| robot_control_node |  |  |
-| so101-ros-physical-ai |  |  |
+```Plaintext
+📦 yolo-edgeai-waste-sorter
+ ┣ 📂 .github              # GitHub Actions 및 issue/PR 템플릿
+ ┣ 📂 ai                   # 1. AI 모델 관련 (데이터 전처리, 학습, 추론)
+ ┃ ┣ 📂 configs            # YOLO 학습 설정 파일 (data.yaml 등)
+ ┃ ┣ 📂 src                # AI 핵심 소스 코드 (preprocess, train, inference)
+ ┃ ┗ 📜 requirements.txt   # AI 패키지 의존성 파일 (PyTorch, Ultralytics 등)
+ ┣ 📂 ros2_ws              # 2. 로봇 제어 관련 (ROS2 워크스페이스)
+ ┃ ┗ 📂 src
+ ┃   ┣ 📂 waste_sorting_bringup   # 전체 노드 실행 및 Launch 파일 패키지
+ ┃   ┣ 📂 waste_detector_node     # YOLO 추론 결과를 받아 토픽으로 발행하는 노드
+ ┃   ┗ 📂 robot_control_node      # 좌표 변환(Homography) 및 로봇 팔(IK) 제어 노드
+ ┣ 📂 docs                 # 3. 문서 및 산출물 관리
+ ┃ ┗ 📜 project_report.md  # 최종 수행 보고서
+ ┗ 📜 .gitignore           # 대용량 데이터셋 및 모델 가중치(.pt, .onnx) 제외 설정
+ ```
 
-## 빌드 테스트 환경 설정 (.venv)
+## 📊 데이터셋 (Dataset)
 
-```bash
+| 구분 | 내용 |
+|---|---|
+| 전체 | 9,999장 (train 7,999 / val 2,000, 80:20 split) |
+| 클래스 | Can (3,333), Pet bottle (3,333), Styrofoam (3,333) |
+| 출처 | AIHub 선별영상 추출 이미지(영상추출) 9,000장, 개별 재활용품 이미지(직접촬영) 999장 ([AIHub 링크](https://www.aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&aihubDataSe=data&dataSetSn=71362)) |
+| 해상도 | 640×640 (YOLO 입력 기준) |
+| 라벨 포맷 | YOLO format (`class_id x_center y_center width height`) |
+
+| Class        | Train    | Val      | Total    |
+|---|---|---|---|
+| Can          | 2,667    | 666      | 3,333    |
+| Pet bottle   | 2,666    | 667      | 3,333    |
+| Styrofoam    | 2,666    | 667      | 3,333    |
+| **Total**    | **7,999**| **2,000**| **9,999**|
+
+> 메타데이터: `dataset_metadata.csv` (이미지별 출처, 클래스, split 정보 포함)
+> 다운로드: [Google Drive](https://drive.google.com/file/d/1G4qchajo2-Tmv9D_KOxuKr_NzRUwT2DO/view?usp=sharing) - `yolo_waste_dataset_v1.0.zip`
+
+## 🛠️ 기술 스택 (Tech Stack)
+- AI / Data: PyTorch, Ultralytics (YOLOv8/v10), OpenCV, Pandas, NumPy, Scikit-learn, Roboflow
+
+- Robotics / HW: ROS2 (Humble/Jazzy), Isaac Sim, Python-Serial (로봇 팔 통신)
+
+- Full-Stack / UI: Streamlit (또는 FastAPI + React), Matplotlib, Plotly
+
+- Collaboration: GitHub
+
+## 🚀 시작하기 (Setup & Installation)
+가상환경 충돌을 예방하기 위해 AI 환경과 ROS2 환경을 반드시 분리하여 터미널을 실행해 주세요.
+
+1. AI & 전처리 환경 설정 (Conda 환경 추천)
+```Bash
+# AI 폴더 이동 및 가상환경 생성
+cd ai
+conda create -n env_sorter_ai python=3.10 -y
+conda activate env_sorter_ai
+
+# 의존성 패키지 설치
+pip install -r requirements.txt
+2. ROS2 로봇 제어 환경 설정 (Ubuntu 네이티브 환경 추천)
+```
+```Bash
+# ROS2 워크스페이스 이동 및 언더레이 소싱
 cd ros2_ws
+source /opt/ros/humble/setup.bash  # 혹은 본인 ROS2 버전명
 
-# 1. venv 생성 및 활성화
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 2. ROS2 환경 등록
-source /opt/ros/jazzy/setup.bash
-
-# 3. 빌드 도구 설치
-pip install colcon-common-extensions
-
-# 4. 빌드
+# 빌드 및 패키지 환경 적용
 colcon build
-
-# 5. 빌드 결과 등록
 source install/setup.bash
 ```
 
-## 각 노드 구성
+## 👥 팀원 및 역할 분배 (Team & Roles)
+### AI 모델 개발 (Model)
 
-### 1. camera_node
+- 데이터 전처리/증강 가이드라인 설계 및 AIHub 데이터 정제 (승현: 0~124 / 성현: 1000~1124 / 범진: 2000~2124 / 세교: 3000~3124)
 
-카메라 영상을 읽어서 ROS2 토픽으로 발행하는 노드
+- YOLO 모델 파인 튜닝, 성능 평가 지표(mAP, IoU) 분석 및 경량화 최적화
 
-*역할:*
-- USB 카메라 또는 웹캠에서 영상 프레임을 읽음
-- OpenCV 이미지를 ROS2 Image 메시지로 변환
-- `/camera/image_raw` 토픽으로 발행
+### 하드웨어 및 인프라 (HW/Cloud)
 
-*파라미터:*
-- `~camera_id`: 카메라 인덱스 (기본값: 0)
-- `~frame_width`: 프레임 너비 (기본값: 640)
-- `~frame_height`: 프레임 높이 (기본값: 480)
-- `~fps`: 초당 프레임 수 (기본값: 30)
+- 비전 카메라 센서 셋업 및 데이터 수집
 
-*흐름:*
-1. `cv2.VideoCapture.read()`: 카메라에서 프레임 읽기
-2. `Image()` 객체 생성: ROS2 메시지 구조 만들기
-3. header, width, height 등 설정: 메시지에 정보 채우기
-4. `frame.tobytes()`: numpy 배열을 바이트로 변환하여 data 필드에 저장
-5. `self.publisher_.publish()`: 토픽(`/camera/image_raw`)으로 발행
+- ROS2 프레임워크 기반 SO-ARM 101 액추에이터 제어 및 공간 좌표 변환(Homography) 궤적 설계
 
-*sensor_msgs/msg/Image 구조:*
-```
-Image
-├── header
-│   ├── stamp: 초 단위 타임스탬프 (float64)
-│   └── frame_id: 좌표계 이름 ("camera_frame")
-├── height: 이미지 높이 (uint32)
-├── width: 이미지 너비 (uint32)
-├── encoding: 코딩 방식 ("bgr8", "rgb8", "mono8")
-├── is_bigendian: 바이트 순서 (bool)
-├── step: 한 줄의 바이트 수 (width × 채널 수)
-└── data: 실제 픽셀 데이터 (uint8[])
-```
+### 풀스택 및 인터페이스 (Full-Stack)
 
-- `data`: 640×480×3 = 921,600 바이트 (BGR 순서)
-- `encoding`: OpenCV는 기본적으로 BGR 포맷 사용
+- 실시간 비전 추론 스트리밍 대시보드 웹 개발
 
-*실행:*
-```bash
-ros2 run camera_node_pkg camera_node
-```
-
-### 2. detector_node
-
-YOLO 기반 객체 탐지 노드
-
-*역할:*
-- `/camera/image_raw` 토픽을 구독(카메라 노드에서 이미지를 수신)
-- YOLO 모델(yolo11n 또는 best.pt)로 객체 탐지 수행
-- 탐지 결과를 `/detection_results` 토픽으로 발행
-
-*파라미터:*
-- `~model_path`: YOLO 모델 파일 경로 (기본값: best.pt)
-- `~conf_threshold`: 탐지 신뢰도 임계값 (기본값: 0.5)
-- `~iou_threshold`: NMS IoU 임계값 (기본값: 0.45)
-- `~device`: 추론 디바이스 (기본값: "cpu")
-
-*흐름:*
-1. 구독: camera_node에서 `/camera/image_raw` 토픽 수신
-2. `imgmsg_to_cv2()`: ROS2 Image 메시지를 OpenCV numpy 배열(BGR)로 변환
-3. `model.predict()`: YOLO 모델로 객체 탐지 수행
-4. `convert_to_detection_msg()`: 탐지 결과를 `Detection2DArray`로 변환
-5. 발행: 토픽(`/detection_results`)으로 탐지 결과 발행
-
-*vision_msgs/msg/Detection2DArray 구조:*
-```
-Detection2DArray
-├── header: 타임스탬프, 프레임 ID
-└── detections[]: 탐지된 객체 리스트
-    └── Detection2D
-        ├── bbox (BoundingBox2D)
-        │   ├── center (Pose2D)
-        │   │   ├── position.x: 중심점 x 좌표 (픽셀)
-        │   │   ├── position.y: 중심점 y 좌표 (픽셀)
-        │   │   └── theta: 회전각
-        │   ├── size_x: 바운딩박스 폭 (픽셀)
-        │   └── size_y: 바운딩박스 높이 (픽셀)
-        └── results[] (ObjectHypothesisWithPose)
-            └── hypothesis (ObjectHypothesis)
-                ├── class_id: 클래스 이름 (string)
-                └── score: 신뢰도 (float64, 0.0~1.0)
-```
-
-*실행:*
-```bash
-ros2 run detector_node_pkg detector_node
-```
-
-*파라미터 예시:*
-```bash
-ros2 run detector_node_pkg detector_node --ros-args \
-  -p model_path:=best.pt \
-  -p conf_threshold:=0.7 \
-  -p device:=cuda
-```
-
-### 3. robot_control_node
+- 상태 피드백 제어 인터페이스 및 데이터 로그 모니터링 구축
 
 
-### 4. so101_bringup_node
+## 🌿 브랜치 전략 및 협업 규칙 (Git Flow)
 
+### 📌 브랜치 운영 규칙
 
-## 실행/테스트 방법
+1. main (최종 배포용)
 
-```bash
-# 전체 실행
+    - 언제든 시연 및 출시 가능한 수준의 가장 안정적인 코드만 관리합니다.
 
-```
+    - 모든 팀원은 이 브랜치에 직접 Push할 수 없습니다.
+
+2. development (개발 통합용)
+
+    - 각 파트별 기능 개발이 완료된 코드들이 모여 최종 통합 테스트를 거치는 공간입니다.
+
+3. feature/기능명-#이슈번호 (단기 작업용)
+
+    - 기능을 잘게 쪼개어 최대 1~2일 이내에 상위 브랜치로 병합(Merge)하는 것을 원칙으로 합니다.
+
+    - 브랜치를 오래 유지하여 대형 충돌(Merge Conflict)이 발생하는 것을 방지합니다.
+
+    - 예시: feature/ai-preprocess-#1, feature/ros2-control-#4
+
+### 🤝 협업 워크플로우 (Workflow)
+
+1. Issue 발행: 개발 시작 전, GitHub Issues에 작업할 내용을 등록하고 이슈 번호(예: #1)를 발급받습니다.
+
+2. 브랜치 생성: development 브랜치로부터 파생된 개별 작업 브랜치를 생성합니다. (git checkout -b feature/기능명-#이슈번호)
+
+3. Pull Request (PR) 및 코드 리뷰:
+
+    - 코드 작성이 완료되면 development 브랜치를 향해 PR을 생성합니다.
+
+    - 최소 1명 이상의 팀원에게 코드 리뷰를 받고 승인(Approve/LGTM)을 얻어야만 병합할 수 있습니다.
