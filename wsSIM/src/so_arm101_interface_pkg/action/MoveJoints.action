@@ -1,0 +1,12 @@
+# Goal
+sensor_msgs/JointState target_state
+builtin_interfaces/Duration duration
+---
+# Result
+bool success
+string message
+sensor_msgs/JointState final_state
+---
+# Feedback
+float32 progress
+sensor_msgs/JointState current_state
