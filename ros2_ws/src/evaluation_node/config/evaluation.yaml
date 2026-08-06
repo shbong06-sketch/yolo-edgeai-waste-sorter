@@ -37,7 +37,7 @@ thresholds_locked: false
 evaluation_phase: final
 
 # results.csv, summary.json, run_state.json, charts/가 저장될 상위 경로다.
-# 실제 실행 결과는 이 경로 아래 evaluation_latest/에 생성된다.
+# 실제 실행 결과는 이 경로 아래 evaluation_YYYYMMDDTHHMMSS_ffffffZ/에 생성된다.
 output_directory: /tmp/so_arm101_evaluation
 
 # YOLO가 실제 class_id로 발행하는 클래스 이름과 정확히 맞춰야 한다.

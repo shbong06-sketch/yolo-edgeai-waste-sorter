@@ -1,4 +1,4 @@
-"""Observation-only ROS 2 adapter for the manual evaluation state machine."""
+"""평가 로직(EvaluationRun)을 ROS 2 토픽/서비스에 연결하는 노드."""
 
 import json
 from datetime import datetime, timezone
@@ -20,7 +20,7 @@ from .visualization import generate_visualizations
 
 
 class EvaluationNode(Node):
-    """Observe detection and robot feedback without publishing robot commands."""
+    """로봇 명령을 발행하지 않고 탐지와 로봇 피드백만 관찰한다."""
 
     def __init__(self):
         super().__init__('evaluation_node')
@@ -40,7 +40,7 @@ class EvaluationNode(Node):
                                  self._detection, 10)
         self.create_subscription(JointState, '/follower/joint_states',
                                  self._joints, 10)
-        # Action 상태와 feedback을 구독만 하며 ActionClient는 만들지 않는다.
+        # 액션 상태와 피드백을 구독만 하며 ActionClient는 만들지 않는다.
         self.create_subscription(
             GoalStatusArray,
             '/follower/joint_trajectory_controller/follow_joint_trajectory/_action/status',
@@ -121,7 +121,7 @@ class EvaluationNode(Node):
                 status='complete', generated_at=manifest.get('generated_at'),
                 files=manifest.get('files', []),
                 warnings=manifest.get('warnings', []), error=None)
-        except Exception as error:  # Finalization must preserve CSV and terminal.
+        except Exception as error:  # 마무리 단계에서 오류가 나도 CSV와 터미널 상태는 보존해야 한다.
             okay = False
             self.run.visualization.update(status='failed', error=str(error))
             self.get_logger().error(f'visualization failed: {error}')
@@ -133,16 +133,20 @@ class EvaluationNode(Node):
     def _detection(self, message):
         if self.run.active is None or not message.detections:
             return
-        candidates = [item for item in message.detections if item.results]
-        if candidates:
-            best = max(candidates, key=lambda item: item.results[0].hypothesis.score)
-            self.run.record_detection(best.results[0].hypothesis.class_id)
+        hypotheses = [
+            result.hypothesis
+            for detection in message.detections
+            for result in detection.results
+        ]
+        if hypotheses:
+            best = max(hypotheses, key=lambda hypothesis: hypothesis.score)
+            self.run.record_detection(best.class_id)
 
     def _joints(self, message):
         self._record_joint_positions(message.name, message.position)
 
     def _record_joint_positions(self, names, positions):
-        """관절 상태와 Action feedback이 공유하는 관절/FK 기록 경로."""
+        """관절 상태와 액션 피드백이 공유하는 관절/FK 기록 경로."""
         try:
             self.latest_joints = ordered_positions(names, positions)
         except (KeyError, ValueError):
@@ -154,7 +158,7 @@ class EvaluationNode(Node):
             self.run.record_fk(forward_kinematics(self.latest_joints))
 
     def _action_feedback(self, message):
-        # feedback도 실제 관절값 캡처에만 사용하며 회차를 자동 종료하지 않는다.
+        # 피드백도 실제 관절값 캡처에만 사용하며 회차를 자동 종료하지 않는다.
         self._record_joint_positions(
             message.feedback.joint_names,
             message.feedback.actual.positions)

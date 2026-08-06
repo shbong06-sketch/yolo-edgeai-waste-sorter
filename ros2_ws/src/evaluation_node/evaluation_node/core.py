@@ -1,4 +1,4 @@
-"""ROS-independent evaluation state machine and durable result writer."""
+"""ROS 없이 테스트 가능한 평가 회차 상태와 결과 파일 저장 로직."""
 
 import csv
 import json
@@ -16,6 +16,25 @@ CSV_FIELDS = (
     'estimated_total_error_mm', 'position_pass', 'operation_complete',
     'operation_complete_source', 'trial_completion_mode', 'failure_reasons')
 
+POSITIVE_CONFIG_KEYS = (
+    'visualization_dpi', 'position_tolerance_mm',
+    'detection_timeout_sec', 'operation_timeout_sec')
+NON_NEGATIVE_CONFIG_KEYS = ('position_warning_mm', 'cooldown_sec')
+
+
+def _validated_float(config, key):
+    try:
+        value = float(config.get(key, 0))
+    except (TypeError, ValueError):
+        raise ValueError(f'{key} must be numeric') from None
+    if not math.isfinite(value):
+        raise ValueError(f'{key} must be finite')
+    if key in POSITIVE_CONFIG_KEYS and value <= 0:
+        raise ValueError(f'{key} must be positive')
+    if key in NON_NEGATIVE_CONFIG_KEYS and value < 0:
+        raise ValueError(f'{key} must be non-negative')
+    return value
+
 
 def atomic_json(path, value):
     path = Path(path)
@@ -27,7 +46,7 @@ def atomic_json(path, value):
 
 
 class EvaluationRun:
-    """Manual trial lifecycle; callbacks only add observations and failures."""
+    """수동 평가 회차 생명주기. 콜백은 관찰값과 실패 사유만 추가한다."""
 
     def __init__(self, config, run_dir, clock=time.monotonic):
         self.config = config
@@ -62,8 +81,28 @@ class EvaluationRun:
             raise ValueError('control keys must be one character')
         if len(set(key.lower() for key in keys)) != 3:
             raise ValueError('control keys must be distinct')
-        if float(config.get('visualization_dpi', 0)) <= 0:
-            raise ValueError('visualization_dpi must be positive')
+        values = {key: _validated_float(config, key)
+                  for key in POSITIVE_CONFIG_KEYS + NON_NEGATIVE_CONFIG_KEYS}
+        tolerance_mm = values['position_tolerance_mm']
+        warning_mm = values['position_warning_mm']
+        if warning_mm > tolerance_mm:
+            raise ValueError('position_warning_mm must not exceed position_tolerance_mm')
+        targets = config.get('target_classes')
+        if not isinstance(targets, list) or not targets or any(not str(item).strip() for item in targets):
+            raise ValueError('target_classes must contain at least one non-empty class')
+        positions = config.get('positions')
+        if not isinstance(positions, dict) or not positions:
+            raise ValueError('positions must contain at least one target position')
+        for position_id, point in positions.items():
+            if not str(position_id).strip():
+                raise ValueError('position IDs must be non-empty')
+            try:
+                x_mm = float(point['x_mm'])
+                y_mm = float(point['y_mm'])
+            except (TypeError, KeyError, ValueError):
+                raise ValueError(f'position {position_id} must define numeric x_mm and y_mm') from None
+            if not (math.isfinite(x_mm) and math.isfinite(y_mm)):
+                raise ValueError(f'position {position_id} coordinates must be finite')
 
     @staticmethod
     def _make_templates(config):
@@ -79,7 +118,7 @@ class EvaluationRun:
         return templates
 
     def next_template(self):
-        """Return the next class/position guide without limiting trial count."""
+        """평가 횟수를 제한하지 않고 다음 클래스/위치 안내를 반환한다."""
         if not self.templates:
             return None
         return self.templates[self.started % len(self.templates)]

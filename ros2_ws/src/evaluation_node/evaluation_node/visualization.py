@@ -1,4 +1,4 @@
-"""Headless, atomic evaluation charts."""
+"""화면 없이 원자적으로 평가 그래프를 생성한다."""
 
 import csv
 from collections import Counter, defaultdict
@@ -38,7 +38,7 @@ def _font():
         if candidate in names:
             plt.rcParams['font.family'] = candidate
             return candidate, []
-    return 'DejaVu Sans', ['Korean font unavailable; English labels used.']
+    return 'DejaVu Sans', ['한국어 글꼴을 찾을 수 없어 영어 라벨을 사용했다.']
 
 
 def _save(fig, path, dpi):
@@ -52,7 +52,7 @@ def _save(fig, path, dpi):
 
 def generate_visualizations(csv_path, run_state, tolerance_mm,
                             warning_mm, dpi=150, enabled=True):
-    """Generate the five required charts once and return a manifest."""
+    """필수 그래프 5개를 한 번 생성하고 manifest를 반환한다."""
     charts = Path(csv_path).parent / 'charts'
     manifest_path = charts / 'visualization_manifest.json'
     if manifest_path.exists():

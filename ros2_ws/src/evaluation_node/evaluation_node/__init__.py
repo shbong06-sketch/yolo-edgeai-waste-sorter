@@ -1,1 +1,1 @@
-"""Observation-only SO-ARM 101 evaluation package."""
+"""SO-ARM 101 평가 노드 패키지."""

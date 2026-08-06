@@ -100,7 +100,7 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        # signal handler가 정상 설치되지 않은 환경에서도 터미널을 복구한다.
+        # 신호 처리기가 정상 설치되지 않은 환경에서도 터미널을 복구한다.
         node.keyboard.restore()
     finally:
         node.keyboard.restore()

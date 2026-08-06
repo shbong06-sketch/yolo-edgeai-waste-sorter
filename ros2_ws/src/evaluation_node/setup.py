@@ -18,7 +18,7 @@ setup(
     zip_safe=True,
     maintainer='shbong',
     maintainer_email='shbong06@gmail.com',
-    description='Observation-only SO-ARM 101 evaluation node',
+    description='SO-ARM 101 관찰 전용 평가 노드',
     license='Apache-2.0',
     entry_points={'console_scripts': [
         'evaluation_node = evaluation_node.evaluation_node:main',
