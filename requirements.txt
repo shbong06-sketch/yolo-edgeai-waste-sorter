@@ -1,0 +1,19 @@
+# === ROS2 Build & Bootstrap Tools ===
+catkin_pkg
+lxml
+empy
+lark
+colcon-common-extensions
+#가상환경(.venv) 내부에서 ROS2 환경을 빌드할 때 colcon 명령어를 정상적으로 인식시키기 위한 필수 도구 세트
+PyYAML
+#follower_controllers.yaml 로봇 제어기 설정 파일이나 카메라 캘리브레이션 셋업 파일을 파이썬 노드에서 파싱하고 관리
+setuptools
+#ROS2 파이썬 노드의 setup.py 진입점을 빌드할 때 빌드 도구 버전 매칭 실패 에러를 방지하기 위해 명시해 두는 것이 좋음
+
+# === EdgeAI Vision & Mathematics ===
+numpy
+#코드 내에서 월드 좌표계 변환을 위한 호모그래피 행렬
+opencv-python
+#카메라 비전 스트림 이미지 처리 및 바운딩 박스(BBox) 픽셀 좌표 가공
+ultralytics
+#로봇 제어 노드와 연동되어 쓰레기를 실시간으로 탐지하는 YOLO 인프라를 이 가상환경 내에서 함께 구동하거나 테스트할 때 필요함

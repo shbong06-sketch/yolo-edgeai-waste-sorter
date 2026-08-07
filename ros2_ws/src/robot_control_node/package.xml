@@ -4,7 +4,7 @@
   <name>robot_control_node</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="shbong06@gmail.com">shbong</maintainer>
+  <maintainer email="yunkim0502@gmail.com">gt</maintainer>
   <license>TODO: License declaration</license>
 
   <test_depend>ament_copyright</test_depend>
