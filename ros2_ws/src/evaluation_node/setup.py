@@ -11,7 +11,6 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name, ['README.md']),
         ('share/' + package_name + '/config', ['config/evaluation.yaml']),
-        ('share/' + package_name + '/docs', ['docs/branch_compatibility.md']),
     ],
     install_requires=['setuptools', 'PyYAML'],
     extras_require={'test': ['pytest']},
