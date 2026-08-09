@@ -34,11 +34,22 @@ ros2_ws/
     │   ├── setup.py
     │   └── setup.cfg
     │
-    └── so101-ros-physical-ai/      # 패키지 4 (물리 AI 로봇)
-        ├── so101_bringup/
-        ├── so101_description/
-        └── so101_teleop/
+    ├── evaluation_node/            # 패키지 4 (평가 노드 - 관찰 기반 성능 기록)
+    │   ├── evaluation_node/
+    │   ├── config/
+    │   ├── test/
+    │   ├── package.xml
+    │   ├── setup.py
+    │   └── setup.cfg
+    │
+    └── feetech_ros2_driver/        # 외부 의존성 (실물 SO-ARM101 드라이버)
+        └── (upstream에서 clone하여 배치 - 아래 "외부 의존성" 참고)
 ```
+
+> **참고**: `so101-ros-physical-ai`와 `feetech_ros2_driver`는 이전에 git submodule로
+> 연결되었으나 submodule 구성(.gitmodules)이 누락된 채 커밋되어 복제 시 빈
+> 디렉토리가 생성되는 문제가 있었습니다. 이를 해결하기 위해 gitlink를 제거하고
+> 실물 드라이버는 아래 "외부 의존성" 절차로 직접 내려받아 사용합니다.
 
 ## 시스템 흐름
 
@@ -95,8 +106,34 @@ ros2_ws/
 |---|---|---|
 | camera_node_pkg | rclpy, sensor_msgs | opencv-python, numpy |
 | detector_node_pkg | rclpy, sensor_msgs, vision_msgs | ultralytics, opencv-python, numpy, torch |
-| robot_control_node |  |  |
-| so101-ros-physical-ai |  |  |
+| robot_control_node | rclpy, vision_msgs, control_msgs, trajectory_msgs, action_msgs, sensor_msgs | numpy |
+| evaluation_node | rclpy, sensor_msgs, vision_msgs, std_srvs | numpy, matplotlib, pyyaml |
+| feetech_ros2_driver (외부) | rclpy, control_msgs, trajectory_msgs, sensor_msgs | - |
+
+## 외부 의존성 (feetech_ros2_driver)
+
+`robot_control_node`는 실물 SO-ARM101 구동을 위해 아래 ROS2 인터페이스를
+사용합니다. 이들은 **프로젝트 저장소에 포함되지 않은 외부 드라이버**가
+제공합니다.
+
+- Action: `/follower/joint_trajectory_controller/follow_joint_trajectory` (`FollowJointTrajectory`)
+- Topic: `/follower/joint_states` (`sensor_msgs/msg/JointState`)
+
+드라이버는 [LeRobot](https://github.com/huggingface/lerobot) 저장소의
+SO-ARM101 / Feetech 구동 코드를 기반으로 한 외부 컴포넌트입니다. 팀에서 확보한
+드라이버 소스를 `ros2_ws/src/feetech_ros2_driver/`에 배치한 뒤 전체 워크스페이스를
+빌드합니다.
+
+```bash
+cd ros2_ws
+source /opt/ros/jazzy/setup.bash
+colcon build
+source install/setup.bash
+```
+
+> **주의**: 이 경로는 `ros2_ws/.gitignore`에 포함되어 있어 커밋되지 않습니다.
+> 상위 프로젝트의 ROS2 파이프라인(detector/robot_control)과 독립적으로 동작하며,
+> 시뮬레이션(`wsSIM`)만 사용할 때는 이 드라이버가 필요 없습니다.
 
 ## 빌드 테스트 환경 설정 (.venv)
 

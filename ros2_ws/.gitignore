@@ -32,6 +32,11 @@ recordings/
 homography_matrix.npy
 
 # ==========================================
+# External Robotics Driver (upstream clone)
+# ==========================================
+src/feetech_ros2_driver/
+
+# ==========================================
 # Python Virtual Environment & Caches
 # ==========================================
 .venv/
