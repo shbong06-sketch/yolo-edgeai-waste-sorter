@@ -47,8 +47,7 @@ ros2_ws/
 ```
 
 > **참고**: `so101-ros-physical-ai`와 `feetech_ros2_driver`는 이전에 git submodule로
-> 연결되었으나 submodule 구성(.gitmodules)이 누락된 채 커밋되어 복제 시 빈
-> 디렉토리가 생성되는 문제가 있었습니다. 이를 해결하기 위해 gitlink를 제거하고
+> 연결되었으나 submodule 구성(.gitmodules)이 누락된 채 커밋되어 복제 시 빈 디렉토리가 생성되는 문제가 있었습니다. 이를 해결하기 위해 gitlink를 제거하고
 > 실물 드라이버는 아래 "외부 의존성" 절차로 직접 내려받아 사용합니다.
 
 ## 시스템 흐름
