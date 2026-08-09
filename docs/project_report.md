@@ -273,32 +273,8 @@ IDLE → APPROACH_1 → APPROACH_2 → APPROACH_2_WAIT → APPROACH_3
 ![PR Curve](../AI/docs/images/exp01_PR_curve.png)
 
 ### 2. Edge Inference 성능 평가
-#### (1) FPS
 
-오프라인 벤치마크(`export_onnx.py`, 50회 평균, 워밍업 5회):
-
-| Model | FPS (CPU) | FPS (GPU) |
-|---|---|---|
-| PyTorch (.pt) | 16.8 | 118.9 |
-| ONNX FP32 | 36.6 | 118.1 |
-| ONNX INT8 | - | 7.9 |
-
-#### (2) Inference Latency
-
-| Model | Inference (ms) | Size (MB) |
-|---|---|---|
-| PyTorch (.pt) CPU | 59.47 | 5.21 |
-| ONNX FP32 CPU | 27.30 | 10.11 |
-| ONNX FP32 GPU | 8.47 | 10.11 |
-| ONNX INT8 GPU | 126.12 | 2.87 |
-
-- **ONNX FP32 CPU**: PyTorch 대비 **2.18x** 속도 향상
-- **ONNX FP32 GPU**: PyTorch와 동등 수준 (0.99x)
-- **INT8 동적 양자화**: GPU/CPU 모두 FP32 대비 현저히 느림 (모델 크기 축소 효과 미미)
-
-### 3. 시스템 통합 테스트
-#### (1) 정상 동작 테스트
-
+#### Inference Latency
 - ROS2 실시간 파이프라인(카메라 → 탐지 → 제어)을 분리 프로세스로 구성하여 토픽 성능을 측정했습니다.
 - **최종 벤치마크 (best.onnx)**:
 
@@ -307,20 +283,45 @@ IDLE → APPROACH_1 → APPROACH_2 → APPROACH_2_WAIT → APPROACH_3
 | /camera/image_raw | 7.13 Hz, 5.87 MB/s | **30.000 Hz, 767.59 KB/s** |
 | /detection_results | 30.01 Hz, 1.08 KB/s | **17.832 Hz, 2.51 KB/s** |
 
+### 3. 시스템 통합 테스트
+#### (1) 정상 동작 테스트
+
 - `evaluation_node`를 통해 실제 탐지·파지 성능을 회차 단위로 기록·분석할 수 있는 환경을 구축했습니다.
+
+**실물 파지 검증 결과 (`references/grasp_metrics_log.csv` 분석)**
+
+SO-ARM101을 활용한 실제 파지 시험을 총 5회의 평가 세션에 걸쳐 **42회 시도**했고, 그리퍼 인코더 실측값(`is_grasped = real_angle > 3.20 rad`)을 기준으로 검증한 결과입니다.
+
+| Class | 시도 | 성공 | 실패 | 성공률 |
+|---|---|---|---|---|
+| Can | 17 | 6 | 11 | 35.3% |
+| Pet bottle | 19 | 2 | 17 | 10.5% |
+| Styrofoam | 6 | 0 | 6 | 0.0% |
+| **전체** | **42** | **8** | **34** | **19.0%** |
+
+- 세션은 2 → 4 → 5 → 9 → 22회차로 점진적으로 규모를 확장하며 진행되었습니다.
+- 성공 파지 시 평균 그리퍼 각도는 **3.631 rad (약 208°)** 로, 실패(3.139 rad, 약 180°) 대비 회전 오프셋이 크게 확인되어 그리퍼 회전각 조절이 파지 성공률에 영향을 주는 주요 인자로 분석됩니다.
+- 클래스별로 **Can**이 가장 높은 성공률을, **Styrofoam**이 가장 낮은 성공률(0%)을 기록하여 비전 탐지 성능(Can 최고)과 유사한 경향을 보였습니다.
 
 #### (2) 예외 상황 테스트
 
-> ⏳ 작성 보류: 예외 상황(객체 미탐지, 파지 실패, 통신 단절 등) 테스트 결과 확보 필요
+- 실물 파지 로그 기준 **42회 중 34회(81.0%)** 가 파지 실패(`is_grasped = False`)로 기록되어, 그리퍼 파지 실패가 실제 환경의 대표적인 예외 상황으로 확인되었습니다.
+- 파지 실패 케이스는 대부분 그리퍼 각도가 판정 기준(3.20 rad) 이하인 상태로, 회전각 최적화 및 파지 보정 로직이 필요한 것으로 판단됩니다.
 
 #### (3) End-to-End 테스트
 
-> ⏳ 작성 보류: 실물 SO-ARM101 완전 자동화 공정(E2E) 시연 결과 확보 필요
+- 카메라 캡처 → YOLO 탐지 → 호모그래피·IK 변환 → SO-ARM101 파지·이송·배출의 완전 자동화 공정을 실물에서 반복 동작시키며 `grasp_metrics_log.csv`로 파지 검증을 기록했습니다 (총 42회 시도, 전체 성공률 19.0%).
+- 회차가 반복될수록 세션 규모를 확장(최대 22회차)하며 연속 자동 분류 동작이 중단 없이 수행되는 것을 확인했습니다.
+- 다만 비전 탐지 성능(mAP50-95 0.898) 대비 파지 성공률이 낮아, 비전 외 제어·기구(그리퍼 회전각, 파지 위치 정밀도) 측면의 추가 개선이 필요함을 확인했습니다.
 
 ### 4. 최종 결과물
 #### (1) 시스템 동작 영상
 
 > ⏳ 작성 보류: 시스템 동작 영상 링크/임베드 필요
+성공 영상
+Can : https://drive.google.com/file/d/1XE1U7wfYTy9lTEl2cB5HbzfakeNWNESF/view?usp=drive_link
+Pet bottle : https://drive.google.com/file/d/1eWYDC7VBBOgO-3HiXYmVbiXpz0JcXdih/view?usp=drive_link
+Styrofoam : https://drive.google.com/file/d/1fJf-ELkzQQ1GUV1QthfkwQKFAL1I5RI3/view?usp=drive_link
 
 #### (2) 주요 동작 이미지
 
@@ -336,6 +337,7 @@ IDLE → APPROACH_1 → APPROACH_2 → APPROACH_2_WAIT → APPROACH_3
 - YOLO 모델을 학습·최적화하여 최종 **yolo11n mAP50-95 0.898**을 달성했습니다. (Hard Negative Mining으로 baseline 대비 +11.3%)
 - 에지 디바이스 환경에 맞춰 모델을 **ONNX FP32로 경량화**하고, CPU에서 PyTorch 대비 **2.18x** 속도 향상을 확인했습니다.
 - ROS2 기반 **카메라 → 탐지 → 호모그래피·IK → SO-ARM101 제어 → 평가**의 실시간 파이프라인을 구현했습니다.
+- 실물 파지 검증을 총 **42회 시도**하여 전체 성공률 **19.0%** (Can 35.3%, Pet bottle 10.5%, Styrofoam 0%)를 기록하고, 그리퍼 회전각이 파지 성공률의 핵심 변수임을 확인했습니다.
 
 ### 2. 문제 해결 과정
 
@@ -367,3 +369,4 @@ IDLE → APPROACH_1 → APPROACH_2 → APPROACH_2_WAIT → APPROACH_3
 3. Ultralytics, "YOLO11 Documentation", https://docs.ultralytics.com
 4. ROS 2 Documentation (Jazzy), https://docs.ros.org/en/jazzy
 5. Hugging Face LeRobot, "SO-ARM101 / Feetech 로봇 드라이버", https://github.com/huggingface/lerobot
+6. 프로젝트 실측 파지 로그, `references/grasp_metrics_log.csv` (trial_id, class_name, real_angle_rad, is_grasped)
