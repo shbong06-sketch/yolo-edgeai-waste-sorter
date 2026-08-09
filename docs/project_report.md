@@ -317,15 +317,31 @@ SO-ARM101을 활용한 실제 파지 시험을 총 5회의 평가 세션에 걸�
 ### 4. 최종 결과물
 #### (1) 시스템 동작 영상
 
-> ⏳ 작성 보류: 시스템 동작 영상 링크/임베드 필요
-성공 영상
-Can : https://drive.google.com/file/d/1XE1U7wfYTy9lTEl2cB5HbzfakeNWNESF/view?usp=drive_link
-Pet bottle : https://drive.google.com/file/d/1eWYDC7VBBOgO-3HiXYmVbiXpz0JcXdih/view?usp=drive_link
-Styrofoam : https://drive.google.com/file/d/1fJf-ELkzQQ1GUV1QthfkwQKFAL1I5RI3/view?usp=drive_link
+클래스별 성공 파지·분류 시연 영상입니다. (GitHub에서 바로 재생 가능)
+
+| 시연 영상 | Can | Pet bottle | Styrofoam |
+|---|---|---|---|
+| | <video src="videos/can.mp4" controls width="360"></video> | <video src="videos/pet_bottle.mp4" controls width="360"></video> | <video src="videos/styrofoam.mp4" controls width="360"></video> |
+
+- Can: https://youtu.be/dOHVYg7yC8s
+- Pet bottle: https://youtu.be/hhFXYMal9BI
+- Styrofoam: https://youtu.be/edXUN9lEa6I
 
 #### (2) 주요 동작 이미지
 
-![시스템/모델 비교](../docs/images/comparison.png)
+**Detection (객체 탐지)**
+
+| Can | Pet bottle | Styrofoam |
+|---|---|---|
+| <img src="images/detection_can.png" width="300"> | <img src="images/detection_pet_bottle.png" width="300"> | <img src="images/detection_styrofoam.png" width="300"> |
+> 참고 : styrofoam 객체 분류 실패
+
+**Grasp (파지·분류)**
+
+| Can | Pet bottle | Styrofoam |
+|---|---|---|
+| <img src="images/grap_can.png" width="300"> | <img src="images/grap_petbottle.png" width="300"> | <img src="images/grap_styrofoam.png" width="300"> |
+
 
 ---
 
@@ -337,21 +353,22 @@ Styrofoam : https://drive.google.com/file/d/1fJf-ELkzQQ1GUV1QthfkwQKFAL1I5RI3/vi
 - YOLO 모델을 학습·최적화하여 최종 **yolo11n mAP50-95 0.898**을 달성했습니다. (Hard Negative Mining으로 baseline 대비 +11.3%)
 - 에지 디바이스 환경에 맞춰 모델을 **ONNX FP32로 경량화**하고, CPU에서 PyTorch 대비 **2.18x** 속도 향상을 확인했습니다.
 - ROS2 기반 **카메라 → 탐지 → 호모그래피·IK → SO-ARM101 제어 → 평가**의 실시간 파이프라인을 구현했습니다.
-- 실물 파지 검증을 총 **42회 시도**하여 전체 성공률 **19.0%** (Can 35.3%, Pet bottle 10.5%, Styrofoam 0%)를 기록하고, 그리퍼 회전각이 파지 성공률의 핵심 변수임을 확인했습니다.
+- 그리퍼 회전각을 파지 성공률의 평가 지표로 삼고, 실물 파지 검증을 총 **42회 시도**하여 전체 성공률 **19.0%** (Can 35.3%, Pet bottle 10.5%, Styrofoam 0%)를 기록하였습니다.
 
 ### 2. 문제 해결 과정
 
-- **ONNX 추론 클래스명 버그**: OnnxEngine이 클래스 ID를 숫자 문자열로 발행하여 로봇 제어 노드의 대상 클래스 매칭이 실패하는 문제를 발견했습니다. 클래스 ID→이름 매핑(`DEFAULT_NAMES`)을 엔진에 추가하여 해결했습니다.
-- **pip 환경 설치 실패**: 요구사항 파일에 포함된 Windows 전용 패키지(`pywin32`)가 Linux에서 설치 실패를 유발하여, 해당 라인을 제거하고 전체 패키지 해석을 검증했습니다.
+- **특정 객체(Styrofoam) 탐지 성능 저하**: Hard Negative Mining 기법을 적용해, 초기 학습 과정에서 실패한 이미지/난이도가 높은 이미지를 재가공하여 학습시키는 방식으로 객체 탐지 성능 저하 문제를 해결했습니다.
 - **네트워크 대역폭 병목**: `Image` → `CompressedImage`(JPEG) 메시지 전환으로 카메라 토픽 Hz를 7.13 → 30.000 Hz로 안정화하고 대역폭을 약 87% 절감했습니다.
 - **추론 병목**: 멀티스레드 프레임 스킵 + 최신 프레임 큐 구조로 이미지 콜백 지연을 해결했습니다.
+<ROS, SIM 파트 문제 및 해결 과정 정리 필요>
 
 ### 3. 프로젝트 한계점
 
 - **INT8 동적 양자화 성능 저하**: `DynamicQuantizeLinear`/`ConvInteger` 런타임 오버헤드로 GPU/CPU 모두 FP32 대비 느려져 실사용 배제되었습니다.
-- **Pet bottle 탐지 난이도**: 색상·형태 다양성으로 인한 intra-class variation이 커 상대적으로 어려운 클래스로 남아 있습니다.
+- **Styrofoam 탐지 난이도**: 색상 다양성, 밝기 및 배경의 차이로 인한 intra-class variation이 커 상대적으로 어려운 클래스로 남아 있습니다.
 - **탐지 Hz 감소**: JPEG 디코딩 오버헤드로 탐지 토픽 Hz가 30 → 17.8로 감소하는 trade-off가 발생했습니다.
 - **시뮬레이션 완성도**: wsSIM은 기본 이동 파이프라인(48/94, 51%)까지 구현되었으며, 그리퍼 열기·닫기와 작업 완료 판정이 미구현 상태입니다.
+- **평가 노드 구현 완성도**: 시간적인 제약으로 인해 평가 항목에 대한 이론적 근거가 부족하고, 평가 자동화를 위한 `evaluation_node`는 실제 실험 환경과 캘리브레이션이 미구현된 상태입니다.
 
 ### 4. 향후 개선 방향
 
@@ -359,6 +376,8 @@ Styrofoam : https://drive.google.com/file/d/1fJf-ELkzQQ1GUV1QthfkwQKFAL1I5RI3/vi
 - JPEG 디코딩 하드웨어 가속 또는 디코딩 파이프라인 최적화로 탐지 Hz 개선
 - 시뮬레이션의 그리퍼 동작·목표 도달 판정·객체 작업 완료 로직 구현
 - 컨베이어 벨트 연동 및 완전 자동화 공정(E2E) 시나리오 확장
+- 단계별 평가 항목 세분화 및 실제/시뮬레이션 환경과 캘리브레이션을 통한 평가 자동화
+- 객체 탐지~로봇 제어 성공률 평가까지, 진정한 의미의 End-to-End 구현을 통한 자동 데이터 수집 및 성능 개선
 
 ---
 
@@ -370,3 +389,4 @@ Styrofoam : https://drive.google.com/file/d/1fJf-ELkzQQ1GUV1QthfkwQKFAL1I5RI3/vi
 4. ROS 2 Documentation (Jazzy), https://docs.ros.org/en/jazzy
 5. Hugging Face LeRobot, "SO-ARM101 / Feetech 로봇 드라이버", https://github.com/huggingface/lerobot
 6. 프로젝트 실측 파지 로그, `references/grasp_metrics_log.csv` (trial_id, class_name, real_angle_rad, is_grasped)
+<평가 노드 개발 시 참고한 논문 자료 등>
