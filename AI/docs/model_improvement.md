@@ -296,6 +296,8 @@ python AI/src/analysis/error_analysis.py --model <모델_경로> --conf 0.5 --io
 | 학습 데이터 | HNM 데이터셋 (843장) |
 | 검증 데이터 | 원본 val set (2000장) |
 
+> 다운로드 : [best_model.zip](https://drive.google.com/file/d/1KsrYNqOEKDWHPK9TAQuReLSKSdXrZs8R/view?usp=sharing)
+
 ### 최종 성능
 
 | 지표 | 값 |
