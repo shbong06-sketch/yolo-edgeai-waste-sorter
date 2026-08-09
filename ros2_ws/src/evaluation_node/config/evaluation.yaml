@@ -1,0 +1,85 @@
+# =============================================================================
+# SO-ARM 101 평가 노드 설정
+#
+# 사용 순서
+# 1. 아래의 positions에 실제로 측정한 GT 좌표를 입력한다.
+# 2. 위치 허용오차와 그리퍼 임계값을 실제 장비 기준으로 확인한다.
+# 3. 모든 값을 확인한 뒤 configuration_confirmed와 thresholds_locked를 true로 바꾼다.
+# 4. colcon build 후 evaluation_node와 keyboard_node를 실행한다.
+#
+# 평가 횟수는 설정하지 않는다. 키보드에서 s를 누른 횟수만큼 회차가 시작되고,
+# e를 누를 때마다 결과가 한 행씩 저장된다. q를 누르면 저장된 결과를 분석한다.
+# =============================================================================
+
+# 평가 제어 방식이다. 현재 Ubuntu 키보드 방식만 지원하므로 변경하지 않는다.
+control_mode: keyboard
+
+# 포그라운드 keyboard_node에서 사용할 키다. Enter 없이 한 글자만 누른다.
+start_key: s
+end_key: e
+quit_key: q
+
+# 평가 종료 시 PNG 그래프 5개를 생성할지 결정한다.
+visualization_enabled: true
+
+# 그래프 해상도다. 기본값 150에서 PNG 크기는 1600×900이다.
+visualization_dpi: 150
+
+# 실제 좌표와 장비 설정을 담당자가 확인했을 때만 true로 바꾼다.
+# false이면 실수로 평가를 시작하지 못하도록 s 입력을 차단한다.
+configuration_confirmed: false
+
+# 아래 오차 및 그리퍼 임계값을 최종 확정했을 때만 true로 바꾼다.
+# evaluation_phase가 final인데 false이면 평가 시작이 차단된다.
+thresholds_locked: false
+
+# final은 최종 평가를 의미한다. 최종 평가에서는 thresholds_locked가 필수다.
+evaluation_phase: final
+
+# results.csv, summary.json, run_state.json, charts/가 저장될 상위 경로다.
+# 실제 실행 결과는 이 경로 아래 evaluation_YYYYMMDDTHHMMSS_ffffffZ/에 생성된다.
+output_directory: /tmp/so_arm101_evaluation
+
+# YOLO가 실제 class_id로 발행하는 클래스 이름과 정확히 맞춰야 한다.
+target_classes: [can, pet bottle, styrofoam]
+
+# 객체를 놓을 위치별 정답 로봇 좌표를 mm 단위로 입력한다.
+# 아래 형식을 참고하되 X/Y 값은 반드시 실제로 측정한 값을 사용한다.
+#
+# positions:
+#   P01:
+#     x_mm: <P01의 실제 X 좌표>
+#     y_mm: <P01의 실제 Y 좌표>
+#   P02:
+#     x_mm: <P02의 실제 X 좌표>
+#     y_mm: <P02의 실제 Y 좌표>
+#
+# 클래스 × 위치 조합은 안내 순서로 계속 순환하며 회차 수를 제한하지 않는다.
+positions: {}
+
+# FK로 계산한 실제 XY와 GT XY 사이의 오차가 이 값 이하면 위치 통과다.
+# 실제 평가 기준을 mm 단위로 입력한다.
+position_tolerance_mm: 0.0
+
+# 이 값은 합격/불합격 판정에는 사용하지 않고 회차별 오차 그래프에만 선으로 표시한다.
+# 허용오차에 가까워지기 전에 눈으로 확인할 경고 기준이며, 통과 기준보다 작게 정한다.
+# 경고선이 필요 없으면 position_tolerance_mm과 같은 값으로 설정하면 된다.
+position_warning_mm: 0.0
+
+# s를 누른 뒤 YOLO 탐지를 기다리는 시간이다.
+# s를 누른 후 객체를 배치할 수 있도록 기본 30초를 제공한다.
+detection_timeout_sec: 30.0
+
+# 한 회차의 전체 작업 제한시간이다. 초과해도 자동 저장하지 않고 실패 사유만 남긴다.
+operation_timeout_sec: 30.0
+
+# e로 저장한 뒤 다음 s를 허용하기 전까지의 안전 대기시간이다.
+cooldown_sec: 3.0
+
+# /follower/joint_states에서 측정한 gripper 값이 이 값 이상이면 열린 상태다.
+# 아래 값은 feature/so101-robot-control에서 확인한 명령값을 기준으로 한 초기값이다.
+# 실제 로봇의 측정값으로 확인한 뒤 thresholds_locked를 true로 바꾼다.
+gripper_open_threshold: 3.5
+
+# 측정한 gripper 값이 이 값 이하가 되는 순간의 6축 관절각을 FK에 사용한다.
+gripper_closed_threshold: 3.0
