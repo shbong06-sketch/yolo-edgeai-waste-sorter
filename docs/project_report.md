@@ -164,7 +164,7 @@ IDLE → APPROACH_1 → APPROACH_2 → APPROACH_2_WAIT → APPROACH_3
 | Optimizer | AdamW |
 | LR Scheduler | Cosine (cos_lr=True) |
 | Warmup Epochs | 3 |
-| 학습 환경 | Google Colab T4 GPU |
+| 학습 환경 | Google Colab L4 GPU |
 
 #### (5) 모델 성능 평가
 
@@ -181,8 +181,8 @@ IDLE → APPROACH_1 → APPROACH_2 → APPROACH_2_WAIT → APPROACH_3
 
 | 지표 | Baseline | 최종 (HNM) | 개선율 |
 |---|---|---|---|
-| Precision | 0.8121 | 0.917 | +13.0% |
-| Recall | 0.8164 | 0.898 | +9.9% |
+| Precision | 0.8121 | 0.918 | +13.0% |
+| Recall | 0.8164 | 0.897 | +9.9% |
 | mAP50 | 0.8719 | 0.957 | +9.8% |
 | mAP50-95 | 0.8066 | 0.898 | +11.3% |
 
@@ -252,8 +252,8 @@ IDLE → APPROACH_1 → APPROACH_2 → APPROACH_2_WAIT → APPROACH_3
 
 | 지표 | 값 |
 |---|---|
-| Precision | 0.917 |
-| Recall | 0.898 |
+| Precision | 0.918 |
+| Recall | 0.897 |
 | mAP50 | 0.957 |
 | mAP50-95 | 0.898 |
 
@@ -264,7 +264,7 @@ IDLE → APPROACH_1 → APPROACH_2 → APPROACH_2_WAIT → APPROACH_3
 | Can | 0.905 | 0.903 | 0.951 | 0.878 |
 | Pet bottle | 0.918 | 0.911 | 0.961 | 0.897 |
 | Styrofoam | 0.927 | 0.880 | 0.958 | 0.919 |
-| **All** | **0.917** | **0.898** | **0.957** | **0.898** |
+| **All** | **0.918** | **0.897** | **0.957** | **0.898** |
 
 #### (3) Confusion Matrix
 
@@ -322,6 +322,7 @@ SO-ARM101을 활용한 실제 파지 시험을 총 5회의 평가 세션에 걸�
 | 시연 영상 | Can | Pet bottle | Styrofoam |
 |---|---|---|---|
 | | <video src="videos/can.mp4" controls width="360"></video> | <video src="videos/pet_bottle.mp4" controls width="360"></video> | <video src="videos/styrofoam.mp4" controls width="360"></video> |
+> Styrofoam 객체 분류 실패
 
 - Can: https://youtu.be/dOHVYg7yC8s
 - Pet bottle: https://youtu.be/hhFXYMal9BI

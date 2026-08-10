@@ -263,7 +263,7 @@ python AI/src/analysis/error_analysis.py --model <모델_경로> --conf 0.5 --io
 | Can | 0.905 | 0.903 | 0.951 | 0.878 |
 | Pet bottle | 0.918 | 0.911 | 0.961 | 0.897 |
 | Styrofoam | 0.927 | 0.880 | 0.958 | 0.919 |
-| **All** | **0.917** | **0.898** | **0.957** | **0.898** |
+| **All** | **0.918** | **0.897** | **0.957** | **0.898** |
 
 #### 혼동행렬
 ![confusion_matrix](./images/exp01_confusion_matrix.png)

@@ -13,7 +13,7 @@
 
 | 파트 | 경로 | 담당 | 핵심 내용 | 상세 문서 |
 |---|---|---|---|---|
-| 1️⃣ AI 모델 | [`AI/`](./AI/) | 봉승현 | 데이터셋 구축, YOLO 학습·실험, 경량화·배포 | [AI/docs](./AI/docs/) |
+| 1️⃣ AI 모델 | [`AI/`](./AI/) | 봉승현 | 데이터셋 구축, YOLO 학습·실험, 가속화·배포 | [AI/docs](./AI/docs/) |
 | 2️⃣ ROS2 실물 파이프라인 | [`ros2_ws/`](./ros2_ws/) | 박성현 | 카메라·탐지·제어·평가 노드 | [ros2_ws/README.md](./ros2_ws/README.md) |
 | 3️⃣ 시뮬레이션 | [`wsSIM/`](./wsSIM/) | 한세교 | Isaac Sim 기반 SO-ARM101 제어 | [wsSIM/README.md](./wsSIM/README.md) |
 | 4️⃣ 프로젝트 문서 | [`docs/`](./docs/) | 봉승현 | 제안서·최종 보고서 | [docs/](./docs/) |
@@ -30,7 +30,7 @@
 
 ### 2. 핵심 목표 (MVP)
 - **데이터셋 구축:** AIHub 데이터를 활용한 **[금속 캔, 페트병, 스티로폼]** 3종 맞춤형 데이터셋 구축 (총 9,999장)
-- **AI 모델 최적화:** 실시간 추론을 위한 경량화된 YOLO 객체 탐지 모델 학습 및 성능 확보 → 최종 **yolo11n (mAP50-95 0.898)**
+- **AI 모델 최적화:** 실시간 추론을 위한 가속화된 YOLO 객체 탐지 모델 학습 및 성능 확보 → 최종 **yolo11n (mAP50-95 0.898)**
 
 ### 3. 추가 목표 (Stretch Goal)
 - **시뮬레이션 및 실물 연동:** SO-ARM 101 로봇 팔과 가상(Isaac Sim) 실험 환경 연동
@@ -42,7 +42,7 @@
 
 ### [ 데이터/학습 파이프라인 (Offline) ]
 ```text
-AIHub 데이터 수집 ──> 전처리·라벨링 ──> YOLO 모델 학습 ──> 오류 분석(HNM) ──> 경량화 배포 (.pt / .onnx)
+AIHub 데이터 수집 ──> 전처리·라벨링 ──> YOLO 모델 학습 ──> 오류 분석(HNM) ──> 가속화 배포 (.pt / .onnx)
                          │                  │                  │                 │
                    AI/src/preprocessing  AI/src/training   AI/src/analysis   AI/src/training
                    build_dataset.py      train.py          error_analysis.py export_onnx.py
@@ -72,7 +72,7 @@ AIHub 데이터 수집 ──> 전처리·라벨링 ──> YOLO 모델 학습 �
 
 ### 1️⃣ AI 모델 (Part 1) — [`AI/`](./AI/)
 
-데이터셋 구축부터 모델 학습, 오류 분석, ONNX 경량화·배포까지의 AI 파이프라인입니다. 파이프라인 전체 로그는 [AI/docs/](./AI/docs/)에서 확인할 수 있습니다.
+데이터셋 구축부터 모델 학습, 오류 분석, ONNX 가속화·배포까지의 AI 파이프라인입니다. 파이프라인 전체 로그는 [AI/docs/](./AI/docs/)에서 확인할 수 있습니다.
 
 | 단계 | 소스 코드 | 상세 문서 |
 |---|---|---|
@@ -89,7 +89,7 @@ AIHub 데이터 수집 ──> 전처리·라벨링 ──> YOLO 모델 학습 �
 | 지표 | Precision | Recall | mAP50 | mAP50-95 |
 |---|---|---|---|---|
 | Baseline (yolo11n) | 0.8121 | 0.8164 | 0.8719 | 0.8066 |
-| **최종 (HNM 적용)** | **0.917** | **0.898** | **0.957** | **0.898** |
+| **최종 (HNM 적용)** | **0.918** | **0.897** | **0.957** | **0.898** |
 
 > 최종 성능 및 클래스별 결과는 [model_improvement.md](./AI/docs/model_improvement.md) 참고
 
