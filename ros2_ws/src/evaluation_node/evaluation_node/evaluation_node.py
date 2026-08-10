@@ -66,12 +66,12 @@ class EvaluationNode(Node):
         self.get_logger().info('평가 노드 준비 완료: 키보드 제어 노드를 실행하세요.')
         self._announce_next()
 
-    def _publishers(self):
+    def _publisher_presence(self):
         return {topic: self.count_publishers(topic) > 0 for topic in
                 ('/detection_results', '/follower/joint_states')}
 
     def _preflight(self):
-        return self.run.preflight(self._publishers(), self.latest_joints is not None,
+        return self.run.preflight(self._publisher_presence(), self.latest_joints is not None,
                                   self.gripper_open)
 
     def start_trial(self, source):
