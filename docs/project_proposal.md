@@ -92,7 +92,7 @@
 
 | 분야 | 기술 |
 | --- | --- |
-| AI/Data | PyTorch, Ultralytics (YOLOv8/v10), OpenCV, Pandas, NumPy, Scikit-learn |
+| AI/Data | PyTorch, Ultralytics (YOLOv8/v10/v11), OpenCV, Pandas, NumPy, Scikit-learn |
 | Robotics / HW | ROS2 (Humble/Jazzy), Isaac Sim (또는 시뮬레이터), Python-Serial (로봇 팔 통신) |
 | Full-Stack / UI | Streamlit (또는 FastAPI + React), Matplotlib, Plotly |
 | 협업 툴 | GitHub, RoboFlow |

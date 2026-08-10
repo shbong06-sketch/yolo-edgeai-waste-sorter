@@ -246,7 +246,7 @@ YOLO 기반 객체 탐지 노드 (멀티스레드 프레임 스킵 적용)
 - `~model_path`: YOLO 모델 파일 경로 (기본값: **best.onnx**)
 - `~conf_threshold`: 탐지 신뢰도 임계값 (기본값: 0.5)
 - `~iou_threshold`: NMS IoU 임계값 (기본값: 0.45)
-- `~device`: 추론 디바이스 (기본값: "cpu", "cuda" 지원)
+- `~device`: 추론 디바이스 (기본값: "cuda", "cpu" 지원)
 - `~imgsz`: 추론 입력 해상도 (기본값: 640)
 
 *스레딩 구조:*
@@ -279,7 +279,7 @@ Detection2DArray
         │   └── size_y: 바운딩박스 높이 (픽셀)
         └── results[] (ObjectHypothesisWithPose)
             └── hypothesis (ObjectHypothesis)
-                ├── class_id: 클래스 이름 (string, 예: "can")
+                ├── class_id: 클래스 이름 (string, 예: "Can")
                 └── score: 신뢰도 (float64, 0.0~1.0)
 ```
 
@@ -311,7 +311,7 @@ ros2 run detector_node_pkg detector_node --ros-args \
 - 실물 관절 상태는 `/follower/joint_states` 구독으로 피드백
 
 *파라미터:*
-- `~target_class`: 처리할 객체 클래스 목록 (기본값: `['can', 'pet bottle', 'styrofoam']`)
+- `~target_class`: 처리할 객체 클래스 목록 (기본값: `['Can', 'Pet bottle', 'styrofoam']`)
 - `~homography_path`: 캘리브레이션 행렬 경로 (기본값: `homography_matrix.npy`)
 
 *상태머신:*
@@ -345,7 +345,7 @@ ros2 run robot_control_node robot_control_node
 *파라미터 예시:*
 ```bash
 ros2 run robot_control_node robot_control_node --ros-args \
-  -p target_class:=['can','pet bottle','styrofoam'] \
+  -p target_class:=['Can','Pet bottle','Styrofoam'] \
   -p homography_path:=homography_matrix.npy
 ```
 
@@ -377,7 +377,7 @@ SO-ARM101의 파지·분류 성능을 **관찰만으로** 측정하는 평가 �
 - `/evaluation/analyze`
 
 *설정 (config/evaluation.yaml):*
-- `target_classes`: `[can, pet bottle, styrofoam]`
+- `target_classes`: `[Can, Pet bottle, Styrofoam]`
 - `positions`: `{P01: {x_mm, y_mm}}` 형태의 GT 좌표 (반드시 실측값 입력)
 - `position_tolerance_mm`: 위치 통과 기준
 - `gripper_open_threshold` / `gripper_closed_threshold`: 그리퍼 상태 판정

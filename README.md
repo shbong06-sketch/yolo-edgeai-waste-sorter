@@ -78,7 +78,7 @@ AIHub 데이터 수집 ──> 전처리·라벨링 ──> YOLO 모델 학습 �
 |---|---|---|
 | 데이터셋 구축 | [`build_dataset.py`](./AI/src/preprocessing/build_dataset.py) · [`sample_dataset.py`](./AI/src/preprocessing/sample_dataset.py) | [dataset.md](./AI/docs/dataset.md) |
 | 전처리 / 증강 | [`preprocess.py`](./AI/src/preprocessing/preprocess.py) · [`preprocess_fast.py`](./AI/src/preprocessing/preprocess_fast.py) · [`fix_jpeg.py`](./AI/src/preprocessing/fix_jpeg.py) | [dataset.md](./AI/docs/dataset.md) |
-| 모델 학습 | [`train.py`](./AI/src/training/train.py) · [`compare_models.py`](./AI/src/training/compare_models.py) | [experiment_log.md](./AI/docs/experiment_log.md) |
+| 모델 학습 | [`train.py`](./AI/src/training/train.py) | [experiment_log.md](./AI/docs/experiment_log.md) |
 | 오류 분석 / HNM | [`error_analysis.py`](./AI/src/analysis/error_analysis.py) · [`generate_hnm_dataset.py`](./AI/src/analysis/generate_hnm_dataset.py) · [`count_overlap.py`](./AI/src/analysis/count_overlap.py) | [model_improvement.md](./AI/docs/model_improvement.md) |
 | 실시간 추론 | [`detect_realtime.py`](./AI/src/inference/detect_realtime.py) | [week01_progress.md](./AI/docs/week01_progress.md) |
 | ONNX 변환·양자화 | [`export_onnx.py`](./AI/src/training/export_onnx.py) | [deployment.md](./AI/docs/deployment.md) |

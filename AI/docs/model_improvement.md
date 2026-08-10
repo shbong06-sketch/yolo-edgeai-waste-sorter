@@ -302,8 +302,8 @@ python AI/src/analysis/error_analysis.py --model <모델_경로> --conf 0.5 --io
 
 | 지표 | 값 |
 |---|---|
-| Precision | 0.917 |
-| Recall | 0.898 |
+| Precision | 0.918 |
+| Recall | 0.897 |
 | mAP50 | 0.957 |
 | mAP50-95 | 0.898 |
 
@@ -326,6 +326,6 @@ python AI/src/analysis/error_analysis.py --model <모델_경로> --conf 0.5 --io
 | LR Scheduler | Cosine |
 | Warmup Epochs | 3 |
 | Early Stopping | patience=20 |
-| 학습 환경 | Google Colab T4 GPU |
+| 학습 환경 | Google Colab L4 GPU |
 
 ---
