@@ -263,7 +263,7 @@ python AI/src/analysis/error_analysis.py --model <모델_경로> --conf 0.5 --io
 | Can | 0.905 | 0.903 | 0.951 | 0.878 |
 | Pet bottle | 0.918 | 0.911 | 0.961 | 0.897 |
 | Styrofoam | 0.927 | 0.880 | 0.958 | 0.919 |
-| **All** | **0.917** | **0.898** | **0.957** | **0.898** |
+| **All** | **0.918** | **0.897** | **0.957** | **0.898** |
 
 #### 혼동행렬
 ![confusion_matrix](./images/exp01_confusion_matrix.png)
@@ -296,12 +296,14 @@ python AI/src/analysis/error_analysis.py --model <모델_경로> --conf 0.5 --io
 | 학습 데이터 | HNM 데이터셋 (843장) |
 | 검증 데이터 | 원본 val set (2000장) |
 
+> 다운로드 : [best_model.zip](https://drive.google.com/file/d/1KsrYNqOEKDWHPK9TAQuReLSKSdXrZs8R/view?usp=sharing)
+
 ### 최종 성능
 
 | 지표 | 값 |
 |---|---|
-| Precision | 0.917 |
-| Recall | 0.898 |
+| Precision | 0.918 |
+| Recall | 0.897 |
 | mAP50 | 0.957 |
 | mAP50-95 | 0.898 |
 
@@ -324,6 +326,6 @@ python AI/src/analysis/error_analysis.py --model <모델_경로> --conf 0.5 --io
 | LR Scheduler | Cosine |
 | Warmup Epochs | 3 |
 | Early Stopping | patience=20 |
-| 학습 환경 | Google Colab T4 GPU |
+| 학습 환경 | Google Colab L4 GPU |
 
 ---
