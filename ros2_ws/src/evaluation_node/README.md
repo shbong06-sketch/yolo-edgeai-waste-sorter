@@ -949,3 +949,372 @@ cd ros2_ws
 colcon test --packages-select evaluation_node
 colcon test-result --verbose
 ```
+## 9. 실제 장비 없이 가상 연동 시험
+
+이 절에서는 실제 카메라, YOLO 탐지 노드, SO-ARM 없이 가짜 ROS 2 메시지를
+입력하여 `evaluation_node`의 데이터 수신부터 결과 생성까지 정상 작동하는지
+확인합니다.
+
+```text
+가짜 YOLO 탐지 데이터 ─┐
+                       ├─> evaluation_node ─> 회차별 결과·통계·그래프
+가짜 로봇 관절 데이터 ─┘
+```
+
+> **주의:** 아래 좌표, 관절값 및 허용오차는 평가 노드의 기능을 검증하기 위한
+> 가상시험 전용 값입니다. 실제 로봇의 정확도 기준이나 교정값으로 사용하면
+> 안 됩니다.
+
+### 9.1 시험 범위
+
+다음 항목을 순서대로 확인합니다.
+
+- 터미널 5개를 이용한 노드별 수동 연동
+- `Detection2DArray` 탐지 데이터 수신
+- `JointState` 관절 데이터 수신
+- 그리퍼 열림·닫힘 상태 판정
+- 관절값을 이용한 FK 좌표 계산
+- 목표 위치와 FK 위치 사이의 오차 계산
+- 10개 회차의 자동 저장
+- 최종 통계 및 PNG 그래프 생성
+
+이 시험은 평가 소프트웨어의 연동 기능만 확인합니다. 실제 로봇을 제어하는
+`robot_control_node`는 실행하지 않습니다.
+
+### 9.2 가상시험용 설정
+
+`config/evaluation.yaml`에서 다음 항목을 가상시험용으로 설정합니다.
+
+```yaml
+configuration_confirmed: true
+thresholds_locked: true
+
+target_classes: [can]
+
+positions:
+  P01:
+    x_mm: 340.0
+    y_mm: 0.0
+
+position_tolerance_mm: 30.0
+position_warning_mm: 15.0
+
+gripper_open_threshold: 3.5
+gripper_closed_threshold: 3.0
+```
+
+| 항목 | 가상시험에서의 의미 |
+|---|---|
+| `target_classes: [can]` | 10회 모두 같은 클래스로 시험 |
+| P01 `(340, 0)` mm | FK 오차 계산의 기준 위치 |
+| 허용오차 `30 mm` | 최대 입력 오차 `25 mm`까지 위치 통과로 기록 |
+| 경고 기준 `15 mm` | 회차별 오차 그래프의 경고선 |
+| 열림 기준 `3.5` | 그리퍼 값 `3.8`을 열린 상태로 판정 |
+| 닫힘 기준 `3.0` | 그리퍼 값 `2.7`을 닫힌 상태로 판정 |
+
+실제 장비 평가를 다시 수행할 때는 `positions`, 허용오차 및 그리퍼 임계값을
+실측값으로 되돌려야 합니다.
+
+평가 노드와 키보드 노드는 시작할 때 실제로 선택한 설정 파일 경로를 출력합니다.
+소스 트리의 YAML이 아닌 사용자 설정을 선택했다면, 노드가 출력한 경로의 설정을
+같은 값으로 수정한 뒤 두 노드를 다시 시작해야 합니다.
+
+### 9.3 빌드 및 패키지 테스트
+
+저장소 루트에서 다음 명령을 실행합니다.
+
+```bash
+cd ros2_ws
+source /opt/ros/jazzy/setup.bash
+
+colcon build --packages-select evaluation_node --symlink-install
+source install/setup.bash
+
+colcon test --packages-select evaluation_node
+colcon test-result --verbose
+```
+
+다음 세 가지를 확인합니다.
+
+1. `colcon build`가 오류 없이 완료되어야 합니다.
+2. `colcon test-result --verbose`에 실패한 테스트가 없어야 합니다.
+3. 새 터미널을 열 때마다 `source install/setup.bash`를 다시 실행해야 합니다.
+
+### 9.4 터미널 5개를 이용한 수동 1회 시험
+
+자동시험 전에 가짜 탐지와 관절 메시지가 실제 평가 노드까지 전달되는지 수동으로
+한 번 확인합니다.
+
+| 터미널 | 역할 |
+|---:|---|
+| 1 | `evaluation_node` 실행 |
+| 2 | `keyboard_node` 실행 및 `s/e` 입력 |
+| 3 | 가짜 YOLO 탐지 데이터 반복 발행 |
+| 4 | 열린 그리퍼 관절 데이터 반복 발행 |
+| 5 | 닫힌 그리퍼 관절 데이터 한 번 발행 |
+
+각 터미널은 저장소 루트에서 다음 공통 준비를 먼저 수행합니다.
+
+```bash
+cd ros2_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+```
+
+#### 터미널 1: 평가 노드
+
+```bash
+ros2 run evaluation_node evaluation_node
+```
+
+평가 상태, 현재 회차 및 다음 시험 대상을 표시합니다. 수동시험이 끝날 때까지
+실행 상태를 유지합니다.
+
+#### 터미널 2: 키보드 노드
+
+```bash
+ros2 run evaluation_node keyboard_node
+```
+
+이번 시험에서는 `s`로 회차를 시작하고 `e`로 저장합니다. `q`는 전체 평가를
+중단 상태로 마감하므로 수동 확인 중에는 사용하지 않습니다.
+
+#### 터미널 3: 가짜 탐지 데이터
+
+```bash
+ros2 topic pub -r 2 \
+  /detection_results \
+  vision_msgs/msg/Detection2DArray \
+  "{header: {frame_id: 'camera'}, detections: [{header: {frame_id: 'camera'}, results: [{hypothesis: {class_id: 'can', score: 0.99}}], bbox: {center: {position: {x: 320.0, y: 240.0}, theta: 0.0}, size_x: 120.0, size_y: 200.0}, id: 'virtual-can'}]}"
+```
+
+`can`, 신뢰도 `0.99`인 가짜 탐지를 초당 2회 발행합니다. 바운딩박스 값은 실제
+탐지 메시지 구조를 재현하기 위한 값이며, 현재 평가 노드의 FK 계산에는 사용되지
+않습니다.
+
+#### 터미널 4: 열린 그리퍼 관절 데이터
+
+```bash
+ros2 topic pub -r 10 \
+  /follower/joint_states \
+  sensor_msgs/msg/JointState \
+  "{name: ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'], position: [3.173806250135391, 1.6820293046726222, 7.590281189777841, 4.512971477959557, 0.0, 3.8]}"
+```
+
+마지막 값 `3.8`이 열린 그리퍼 상태입니다. 약 2초 동안 발행하여 평가 노드가
+유효한 6축 관절값과 열린 그리퍼 상태를 수신하게 합니다.
+
+#### 터미널 5: 닫힌 그리퍼 관절 데이터
+
+터미널 5에서는 공통 준비 명령까지만 실행한 뒤 기다립니다. 회차를 시작한 후
+아래 명령을 한 번만 사용합니다.
+
+```bash
+ros2 topic pub --once \
+  /follower/joint_states \
+  sensor_msgs/msg/JointState \
+  "{name: ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'], position: [3.173806250135391, 1.6820293046726222, 7.590281189777841, 4.512971477959557, 0.0, 2.7]}"
+```
+
+마지막 값 `2.7`이 닫힌 그리퍼 상태입니다. 활성 회차에서 이 메시지를 수신하면
+평가 노드는 해당 관절값으로 FK 좌표를 계산합니다.
+
+#### 수동시험 실행 순서
+
+1. 터미널 1~4를 실행하고 약 2초 기다립니다.
+2. 터미널 2에서 `s`를 한 번 누릅니다. Enter는 누르지 않습니다.
+3. 터미널 1에 `T001` 시작 안내가 표시되는지 확인합니다.
+4. 터미널 4에서 `Ctrl+C`를 눌러 열린 관절 데이터 발행을 중단합니다.
+5. 터미널 5에서 닫힌 그리퍼 관절값을 한 번 발행합니다.
+6. 약 2초 기다린 뒤 터미널 2에서 `e`를 한 번 누릅니다.
+7. 터미널 1에 `T001` 저장과 다음 시험 안내가 표시되는지 확인합니다.
+
+수동시험 결과를 완료 상태로 분석하려면 터미널 5에서 다음 서비스를 한 번
+호출합니다.
+
+```bash
+ros2 service call /evaluation/analyze std_srvs/srv/Trigger "{}"
+```
+
+분석이 끝나면 실행 중인 나머지 터미널에서 `Ctrl+C`를 눌러 모든 노드와
+publisher를 종료합니다. 기존 노드를 켜 둔 채 다음 자동시험을 시작하면 노드와
+서비스가 중복될 수 있습니다.
+
+### 9.5 FK 오차 10회 자동시험
+
+수동시험에 사용한 프로세스를 모두 종료한 뒤 새 터미널 하나에서 다음 자동화
+코드를 실행합니다. 이 코드는 가짜 탐지와 관절 메시지 발행, 회차 시작·종료 및
+최종 분석을 순서대로 수행합니다.
+
+각 회차에서는 `shoulder_pan`만 변경하고 다른 팔 관절은 고정합니다. 그리퍼는
+매 회차 `3.8(열림) → 2.7(닫힘)`으로 전환합니다.
+
+<details>
+<summary><strong>10회 자동시험 코드 펼치기</strong></summary>
+
+```bash
+cd ros2_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+set -euo pipefail
+
+EVAL_PID=""
+DETECTION_PID=""
+JOINT_PID=""
+
+cleanup() {
+  if [ -n "${JOINT_PID}" ]; then kill "${JOINT_PID}" 2>/dev/null || true; fi
+  if [ -n "${DETECTION_PID}" ]; then kill "${DETECTION_PID}" 2>/dev/null || true; fi
+  if [ -n "${EVAL_PID}" ]; then kill "${EVAL_PID}" 2>/dev/null || true; fi
+}
+trap cleanup EXIT INT TERM
+
+ros2 run evaluation_node evaluation_node \
+  > /tmp/evaluation_node_virtual.log 2>&1 &
+EVAL_PID=$!
+
+ros2 topic pub -r 2 \
+  /detection_results \
+  vision_msgs/msg/Detection2DArray \
+  "{header: {frame_id: 'camera'}, detections: [{header: {frame_id: 'camera'}, results: [{hypothesis: {class_id: 'can', score: 0.99}}], bbox: {center: {position: {x: 320.0, y: 240.0}, theta: 0.0}, size_x: 120.0, size_y: 200.0}, id: 'virtual-can'}]}" \
+  > /tmp/evaluation_detection_virtual.log 2>&1 &
+DETECTION_PID=$!
+
+for WAIT_COUNT in $(seq 1 30); do
+  if ros2 service type /evaluation/preflight >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+if ! ros2 service type /evaluation/preflight >/dev/null 2>&1; then
+  echo "오류: evaluation_node가 30초 안에 시작되지 않았습니다."
+  exit 1
+fi
+
+PAN_VALUES=(
+  3.173806250135391
+  3.167923888713281
+  3.162041476404774
+  3.156158962319512
+  3.150276295559212
+  3.144393425213701
+  3.138510300356951
+  3.129685024412792
+  3.114974236519526
+  3.100260264027746
+)
+
+for TRIAL_INDEX in "${!PAN_VALUES[@]}"; do
+  PAN="${PAN_VALUES[$TRIAL_INDEX]}"
+  TRIAL_NUMBER=$((TRIAL_INDEX + 1))
+
+  echo "===== T$(printf '%03d' "${TRIAL_NUMBER}") / shoulder_pan=${PAN} ====="
+
+  ros2 topic pub -r 10 \
+    /follower/joint_states \
+    sensor_msgs/msg/JointState \
+    "{name: ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'], position: [${PAN}, 1.6820293046726222, 7.590281189777841, 4.512971477959557, 0.0, 3.8]}" \
+    > /tmp/evaluation_joint_virtual.log 2>&1 &
+  JOINT_PID=$!
+
+  sleep 2
+  ros2 service call /evaluation/preflight std_srvs/srv/Trigger "{}"
+  ros2 service call /evaluation/start_next_trial std_srvs/srv/Trigger "{}"
+  sleep 1
+
+  kill "${JOINT_PID}" 2>/dev/null || true
+  wait "${JOINT_PID}" 2>/dev/null || true
+  JOINT_PID=""
+
+  ros2 topic pub --once \
+    /follower/joint_states \
+    sensor_msgs/msg/JointState \
+    "{name: ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'], position: [${PAN}, 1.6820293046726222, 7.590281189777841, 4.512971477959557, 0.0, 2.7]}"
+
+  sleep 1
+  ros2 service call /evaluation/record_grasp std_srvs/srv/Trigger "{}"
+  ros2 service call /evaluation/record_sort std_srvs/srv/Trigger "{}"
+  ros2 service call /evaluation/end_trial std_srvs/srv/Trigger "{}"
+  sleep 3.2
+done
+
+ros2 service call /evaluation/analyze std_srvs/srv/Trigger "{}"
+sleep 5
+
+cleanup
+trap - EXIT INT TERM
+
+echo "10회 가상 연동 시험이 완료되었습니다."
+```
+
+</details>
+
+정상 실행되면 T001부터 T010까지 차례대로 진행되고, 마지막 분석 단계에서
+`analysis complete` 응답이 출력됩니다. 결과는 앞 절에서 설명한
+`/tmp/so_arm101_evaluation/evaluation_.../` 구조로 저장됩니다.
+
+### 9.6 2026-08-10 실행 결과
+
+목표 좌표는 10회 모두 `(340.0, 0.0) mm`로 고정하고 `shoulder_pan`만
+단계적으로 변경했습니다.
+
+| 회차 | `shoulder_pan` 입력 | FK X (mm) | FK Y (mm) | FK 오차 (mm) | 위치 판정 |
+|---:|---:|---:|---:|---:|:---:|
+| T001 | 3.173806250135391 | 340.000 | 0.000 | 0.00 | 통과 |
+| T002 | 3.167923888713281 | 339.994 | 2.000 | 2.00 | 통과 |
+| T003 | 3.162041476404774 | 339.976 | 4.000 | 4.00 | 통과 |
+| T004 | 3.156158962319512 | 339.947 | 6.000 | 6.00 | 통과 |
+| T005 | 3.150276295559212 | 339.906 | 7.999 | 8.00 | 통과 |
+| T006 | 3.144393425213701 | 339.853 | 9.999 | 10.00 | 통과 |
+| T007 | 3.138510300356951 | 339.788 | 11.998 | 12.00 | 통과 |
+| T008 | 3.129685024412792 | 339.669 | 14.996 | 15.00 | 통과 |
+| T009 | 3.114974236519526 | 339.412 | 19.991 | 20.00 | 통과 |
+| T010 | 3.100260264027746 | 339.081 | 24.983 | 25.00 | 통과 |
+
+`shoulder_pan` 입력을 변경하자 FK Y 좌표와 전체 FK 오차가 의도한 순서대로
+증가했습니다. 따라서 각 회차의 관절값이 실제 FK 계산과 결과 저장에 반영됐음을
+확인할 수 있습니다.
+
+![회차별 FK 오차](resource/trial.png)
+
+| 평가 항목 | 실행 결과 |
+|---|---:|
+| 최종 실행 상태 | `COMPLETED` |
+| 시작한 회차 | 10회 |
+| 기록된 회차 | 10회 |
+| 폐기된 회차 | 0회 |
+| 탐지 성공률 | 100.0% |
+| 클래스 정확도 | 100.0% |
+| 위치 통과율 | 100.0% |
+| 평균 FK 오차 | 10.20 mm |
+| P95 FK 오차 | 22.75 mm |
+| FK 누락 | 0건 |
+| 실패 | 0건 |
+
+위치 통과율이 100%인 이유는 가상시험의 위치 허용오차가 `30 mm`이고 가장 큰
+입력 오차가 `25 mm`였기 때문입니다. 이는 실제 로봇의 위치 정확도가 100%라는
+뜻이 아닙니다.
+
+### 9.7 판정 및 한계
+
+수동시험에서는 평가 노드, 키보드 노드, 가짜 탐지 publisher 및 관절 publisher가
+서로 연결되어 `s → 탐지·관절 수신 → 그리퍼 닫힘 → e` 흐름을 완료했습니다.
+
+이후 별도로 수행한 10회 자동시험에서는 다음 항목을 확인했습니다.
+
+1. 가짜 탐지 메시지의 `can` 클래스와 신뢰도 `0.99`를 수신했습니다.
+2. 가짜 관절 상태와 그리퍼 열림·닫힘 변화를 수신했습니다.
+3. 회차마다 달라진 `shoulder_pan` 값을 FK 계산에 반영했습니다.
+4. FK 오차를 `0, 2, 4, 6, 8, 10, 12, 15, 20, 25 mm`로 구분해 기록했습니다.
+5. 10회가 누락 없이 저장되고 실행 상태가 `COMPLETED`로 종료됐습니다.
+6. 평균, P95, 성공률 및 결과 그래프가 생성됐으며 실패는 0건이었습니다.
+
+따라서 **`evaluation_node`의 ROS 2 데이터 수신, 그리퍼 판정, FK 계산, 위치
+오차 계산, 회차 저장 및 결과 분석 기능이 가상 연동 환경에서 정상 작동함을
+확인했습니다.**
+
+다만 이 결과는 평가 소프트웨어의 기능시험입니다. 실제 카메라의 탐지 성능,
+호모그래피 좌표 변환, 로봇 궤적 실행, 물체 파지 성공률 및 SO-ARM의 물리적
+반복정밀도는 실제 장비를 연결한 별도 시험으로 확인해야 합니다.
