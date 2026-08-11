@@ -413,4 +413,8 @@ SO-ARM101을 활용한 실제 파지 시험을 총 5회의 평가 세션에 걸�
 4. ROS 2 Documentation (Jazzy), https://docs.ros.org/en/jazzy
 5. Hugging Face LeRobot, "SO-ARM101 / Feetech 로봇 드라이버", https://github.com/huggingface/lerobot
 6. 프로젝트 실측 파지 로그, `references/grasp_metrics_log.csv` (trial_id, class_name, real_angle_rad, is_grasped)
-7. 정리
+7. L. Berscheid, T. Rühr, T. Kröger, "Improving Data Efficiency of Self-supervised Learning for Robotic Grasping", ICRA 2019, https://doi.org/10.1109/ICRA.2019.8793952
+8. A. Azab, H. Pourvaziri, "Scheduling in Industry 4.0: A Digital Twin-based approach for scheduling and smart Material-Handling Considerations", Manufacturing Letters 44, pp. 136-147, 2025, https://doi.org/10.1016/j.mfglet.2025.06.018
+9. S. Du, F. Teng, Z. Zhuang, D. Zhang, M. Li, H. Li, Y. Weng, "A BIM-enabled robot control system for automated integration between rebar reinforcement and 3D concrete printing", Virtual and Physical Prototyping 19(1), e2332423, 2024, https://doi.org/10.1080/17452759.2024.2332423
+10. S. Kadalagere Sampath, N. Wang, C. Yang, H. Wu, C. Liu, M. Pearson, "A Vision-Guided Deep Learning Framework for Dexterous Robotic Grasping Using Gaussian Processes and Transformers", Applied Sciences 15(5), 2615, 2025, https://doi.org/10.3390/app15052615
+11. L. Gao, Q. Feng, S. Chen, Z. Yang, F. Fan, L. Chen, C. Zhao, "Real-Time Constrained Visual Servoing for Agricultural Harvesting Robots via MPC-Guided Reinforcement Learning", AI 7(4), 124, 2026, https://doi.org/10.3390/ai7040124
