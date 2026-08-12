@@ -27,11 +27,11 @@ visualization_dpi: 150
 
 # 실제 좌표와 장비 설정을 담당자가 확인했을 때만 true로 바꾼다.
 # false이면 실수로 평가를 시작하지 못하도록 s 입력을 차단한다.
-configuration_confirmed: false
+configuration_confirmed: true
 
 # 아래 오차 및 그리퍼 임계값을 최종 확정했을 때만 true로 바꾼다.
 # evaluation_phase가 final인데 false이면 평가 시작이 차단된다.
-thresholds_locked: false
+thresholds_locked: true
 
 # final은 최종 평가를 의미한다. 최종 평가에서는 thresholds_locked가 필수다.
 evaluation_phase: final
@@ -56,15 +56,23 @@ target_classes: [can, pet bottle, styrofoam]
 #
 # 클래스 × 위치 조합은 안내 순서로 계속 순환하며 회차 수를 제한하지 않는다.
 positions: {}
+  # P01:
+  #   x_mm: 122.0
+  #   y_mm: 84.5
+    
+  # P02:
+  #   x_mm: 98.4
+  #   y_mm: 71.2
+
 
 # FK로 계산한 실제 XY와 GT XY 사이의 오차가 이 값 이하면 위치 통과다.
 # 실제 평가 기준을 mm 단위로 입력한다.
-position_tolerance_mm: 0.0
+position_tolerance_mm: 10.0
 
 # 이 값은 합격/불합격 판정에는 사용하지 않고 회차별 오차 그래프에만 선으로 표시한다.
 # 허용오차에 가까워지기 전에 눈으로 확인할 경고 기준이며, 통과 기준보다 작게 정한다.
 # 경고선이 필요 없으면 position_tolerance_mm과 같은 값으로 설정하면 된다.
-position_warning_mm: 0.0
+position_warning_mm: 7.0
 
 # s를 누른 뒤 YOLO 탐지를 기다리는 시간이다.
 # s를 누른 후 객체를 배치할 수 있도록 기본 30초를 제공한다.

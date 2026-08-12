@@ -1,0 +1,19 @@
+{
+  "status": "complete",
+  "run_label": "PARTIAL",
+  "generated_at": "2026-08-12T22:02:21.910869+00:00",
+  "recorded_trials": 9,
+  "files": [
+    "overall_summary.png",
+    "class_performance.png",
+    "trial_position_error.png",
+    "target_vs_fk.png",
+    "failure_reasons.png"
+  ],
+  "warnings": [],
+  "image_size": [
+    1600,
+    900
+  ],
+  "dpi": 150
+}

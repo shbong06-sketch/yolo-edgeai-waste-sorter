@@ -1,0 +1,33 @@
+{
+  "status": "stopped",
+  "recorded_trials": 9,
+  "detection_success_rate": 1.0,
+  "class_accuracy": 1.0,
+  "position_pass_rate": 0.6666666666666666,
+  "mean_fk_error_mm": 8.277777777777759,
+  "valid_fk_measurements": 9,
+  "repeatability_error_stddev_mm": 4.031894447961918,
+  "class_performance": {
+    "can": {
+      "trials": 3,
+      "detection_rate": 1.0,
+      "class_accuracy": 1.0,
+      "mean_fk_error_mm": 9.833333333333343,
+      "valid_fk_measurements": 3
+    },
+    "pet bottle": {
+      "trials": 3,
+      "detection_rate": 1.0,
+      "class_accuracy": 1.0,
+      "mean_fk_error_mm": 10.083333333333314,
+      "valid_fk_measurements": 3
+    },
+    "styrofoam": {
+      "trials": 3,
+      "detection_rate": 1.0,
+      "class_accuracy": 1.0,
+      "mean_fk_error_mm": 4.916666666666619,
+      "valid_fk_measurements": 3
+    }
+  }
+}

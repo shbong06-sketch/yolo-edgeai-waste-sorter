@@ -1,0 +1,29 @@
+{
+  "status": "stopped",
+  "reason": "operator_analysis_requested",
+  "planned_trials": null,
+  "started_trials": 9,
+  "recorded_trials": 9,
+  "discarded_trials": 0,
+  "discarded_trial_ids": [],
+  "active_trial_id": null,
+  "keyboard": {
+    "available": false,
+    "start_key": "s",
+    "end_key": "e",
+    "quit_key": "q"
+  },
+  "visualization": {
+    "status": "complete",
+    "generated_at": "2026-08-12T22:02:21.910869+00:00",
+    "files": [
+      "overall_summary.png",
+      "class_performance.png",
+      "trial_position_error.png",
+      "target_vs_fk.png",
+      "failure_reasons.png"
+    ],
+    "warnings": [],
+    "error": null
+  }
+}
