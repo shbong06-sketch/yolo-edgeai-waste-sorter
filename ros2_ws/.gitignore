@@ -52,3 +52,8 @@ dist/
 .vscode/
 .idea/
 *.sw
+
+
+
+# dry_run 평가결과 데이터 생성폴더
+tmp/
