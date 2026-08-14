@@ -183,10 +183,20 @@ class OnnxEngine:
     전처리/후처리(리사이즈, 정규화, NMS)를 직접 수행한다.
     """
 
-    def __init__(self, model_path: str, device: str = 'cuda', imgsz: int = 640):
+    # 프로젝트 데이터셋(data.yaml) 기준 기본 클래스 이름 매핑.
+    # ONNX 모델 출력은 클래스 ID(index)만 담고 이름을 갖지 않으므로,
+    # ID를 이름으로 바꿔주기 위한 기본값이다. (YoloEngine은 result.names 사용)
+    DEFAULT_NAMES = {0: 'Can', 1: 'Pet bottle', 2: 'Styrofoam'}
+
+    def __init__(
+        self, model_path: str, device: str = 'cuda', imgsz: int = 640,
+        names: dict = None,
+    ):
         """Initialize OnnxEngine."""
         self.imgsz = imgsz
         self.model_path = model_path
+        # names 미지정 시 프로젝트 기본 클래스 이름 사용
+        self.names = names if names else self.DEFAULT_NAMES
 
         # CUDA 라이브러리 프리로드 (onnxruntime import 전에 실행되어야 함)
         # LD_LIBRARY_PATH에 nvidia 패키지 경로가 없으면 onnxruntime이
@@ -387,7 +397,7 @@ class OnnxEngine:
             by2 = max(0, min(by2, orig_h))
 
             detections.append({
-                'class_name': str(class_ids[i]),
+                'class_name': self.names.get(int(class_ids[i]), str(class_ids[i])),
                 'confidence': float(confidences[i]),
                 'bbox': [
                     float(bx1), float(by1),
@@ -440,7 +450,8 @@ class EngineFactory:
     """
 
     @staticmethod
-    def create(model_path: str, device: str = 'cuda', imgsz: int = 640):
+    def create(model_path: str, device: str = 'cuda', imgsz: int = 640,
+               names: dict = None):
         """
         추론 엔진 생성.
 
@@ -448,6 +459,7 @@ class EngineFactory:
             model_path: 모델 파일 경로 (.pt 또는 .onnx)
             device: 추론 디바이스 ('cuda' 또는 'cpu')
             imgsz: 입력 이미지 크기
+            names: 클래스 ID → 이름 매핑 (ONNX 경로 전용, 미지정 시 기본값)
 
         Returns
         -------
@@ -458,7 +470,7 @@ class EngineFactory:
         if ext == '.pt':
             return YoloEngine(model_path, device, imgsz)
         elif ext == '.onnx':
-            return OnnxEngine(model_path, device, imgsz)
+            return OnnxEngine(model_path, device, imgsz, names=names)
         else:
             raise ValueError(
                 f'지원하지 않는 모델 형식: {ext} '

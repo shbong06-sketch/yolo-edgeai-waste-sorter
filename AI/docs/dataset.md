@@ -169,8 +169,11 @@ parallel:
 
 | 항목 | 내용 |
 |---|---|
-| 파일명 | `yolo_waste_dataset_v1.0.zip` |
-| 링크 | [Google Drive](https://drive.google.com/file/d/1G4qchajo2-Tmv9D_KOxuKr_NzRUwT2DO/view?usp=sharing) |
+| 파일명 | `yolo_waste_dataset_v3.0.zip` |
+| 링크 | [yolo_waste_dataset_v3.0.zip](https://drive.google.com/file/d/1YwxGctreCivOjuJ5DvqFp6z17AK1IuOL/view?usp=drive_link) |
+| 압축 해제 경로 | `AI/data/dataset/` |
+| 파일명 | `hnm_dataset.zip` |
+| 링크 | [hnm_dataset.zip](https://drive.google.com/file/d/1qLXKsI64R1wKvXUHEHsLN9n1poKLQCxC/view?usp=drive_link) |
 | 압축 해제 경로 | `AI/data/dataset/` |
 
 ---

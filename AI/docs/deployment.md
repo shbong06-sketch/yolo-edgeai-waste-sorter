@@ -33,7 +33,7 @@ best_int8.onnx (ONNX INT8)
 
 | Technique | Description | Status |
 |-----------|-------------|--------|
-| INT8 | 8비트 정량화 → 모델 크기 약 75% 감소 | onnxruntime 동적 양자화 적용 (CPU 한계) |
+| INT8 | 8비트 정량화 → FP32 대비 모델 크기 71.6% 감소 | onnxruntime 동적 양자화 적용 (CPU 한계) |
 
 ---
 

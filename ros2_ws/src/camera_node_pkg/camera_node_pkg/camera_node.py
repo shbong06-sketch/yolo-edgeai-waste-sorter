@@ -15,7 +15,7 @@ class CameraNode(Node):
     - /camera/image_raw 토픽으로 발행
     
     파라미터:
-    - ~camera_id: 카메라 인덱스 (기본값: 0)
+    - ~camera_id: 카메라 인덱스 (기본값: 2)
     - ~frame_width: 프레임 너비 (기본값: 640)
     - ~frame_height: 프레임 높이 (기본값: 480)
     - ~fps: 초당 프레임 수 (기본값: 30)
