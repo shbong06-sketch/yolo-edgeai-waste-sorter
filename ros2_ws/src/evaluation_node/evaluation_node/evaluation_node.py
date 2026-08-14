@@ -26,9 +26,19 @@ class EvaluationNode(Node):
         super().__init__('evaluation_node')
         # 인자를 생략하면 사용자 설정 또는 설치된 기본 설정을 자동으로 찾는다.
         self.declare_parameter('config_path', '')
+        self.declare_parameter('output_directory', '')
         self.config, config_path = load_config(self.get_parameter('config_path').value)
+
+        # launch 실행용 evaluation.yaml 경로 지정.
+        output_override = str(self.get_parameter('output_directory').value).strip()
+        if output_override:
+            self.config['output_directory'] = output_override
+
+
         EvaluationRun.validate_config(self.config)
-        run_root = Path(self.config.get('output_directory') or tempfile.gettempdir())
+        run_root = Path(
+            self.config.get('output_directory') or tempfile.gettempdir()
+        ).expanduser()
         # 기존 평가 결과를 덮어쓰지 않도록 실행할 때마다 고유 폴더를 만든다.
         run_name = datetime.now(timezone.utc).strftime('evaluation_%Y%m%dT%H%M%S_%fZ')
         self.run = EvaluationRun(self.config, run_root / run_name)
@@ -66,12 +76,12 @@ class EvaluationNode(Node):
         self.get_logger().info('평가 노드 준비 완료: 키보드 제어 노드를 실행하세요.')
         self._announce_next()
 
-    def _publishers(self):
+    def _publisher_presence(self):
         return {topic: self.count_publishers(topic) > 0 for topic in
                 ('/detection_results', '/follower/joint_states')}
 
     def _preflight(self):
-        return self.run.preflight(self._publishers(), self.latest_joints is not None,
+        return self.run.preflight(self._publisher_presence(), self.latest_joints is not None,
                                   self.gripper_open)
 
     def start_trial(self, source):

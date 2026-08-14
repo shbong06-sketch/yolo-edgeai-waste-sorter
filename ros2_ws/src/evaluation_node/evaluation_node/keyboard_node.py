@@ -25,7 +25,7 @@ class KeyboardControlNode(Node):
             config['end_key'].lower(): 'end_trial',
             config['quit_key'].lower(): 'stop_run',
         }
-        self.clients = {
+        self.service_clients = {
             name: self.create_client(Trigger, f'/evaluation/{name}')
             for name in ('start_next_trial', 'end_trial', 'stop_run', 'analyze')
         }
@@ -58,7 +58,7 @@ class KeyboardControlNode(Node):
         self._request(service)
 
     def _request(self, service):
-        client = self.clients[service]
+        client = self.service_clients[service]
         if not client.service_is_ready():
             self.get_logger().warning(
                 f'/evaluation/{service} 서비스를 사용할 수 없습니다.')

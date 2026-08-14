@@ -1,3 +1,6 @@
+from glob import glob
+import os
+
 from setuptools import find_packages, setup
 
 package_name = 'evaluation_node'
@@ -11,6 +14,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name, ['README.md']),
         ('share/' + package_name + '/config', ['config/evaluation.yaml']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools', 'PyYAML'],
     extras_require={'test': ['pytest']},
@@ -22,5 +26,6 @@ setup(
     entry_points={'console_scripts': [
         'evaluation_node = evaluation_node.evaluation_node:main',
         'keyboard_node = evaluation_node.keyboard_node:main',
+        'dry_run = evaluation_node.dry_run.dry_run:main',
     ]},
 )
